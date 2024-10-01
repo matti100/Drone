@@ -97,7 +97,7 @@ elseif (tuner_flag == 2)
     disp('-----------------------------------');
     
     pop_size = 100;
-    maxGen = 1500;
+    maxGen = 2000;
     tol = 1e-2;
     mutation_rate = 0.3;
     kMax = 1e-2;

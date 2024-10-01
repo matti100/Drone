@@ -1,7 +1,7 @@
 function tunedGains = ga_tuner(Drone, pop_size, maxGen, mutation_rate, kMax, tol)
 
 % Starting Parallel computing
-parpool("Processes", 8);
+parpool("Processes");
 
 % Random popolation intialization
 pop = rand(pop_size, 18) .* kMax;
