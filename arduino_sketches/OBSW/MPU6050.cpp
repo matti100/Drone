@@ -216,11 +216,55 @@ void MPU6050::get_meas() {
   yawRate -= RateCalibrationYaw;
 }
 
+// -------------- COMPUTE LIFT-TORQUE COEFFICIENTS --------------
+void MPU6050::computeLiftTorqueCoefficients(float vel) {
+
+  // L = kF * w^2       ->      kF = T / w^2
+  // C = kM * w^2       ->      kM = C / w^2
+
+  // Convert angular velocity from [millisec] to [rpm]
+  // BLDC motor used: 1000 KV
+  // Battery used: 3S (11.1 V fully charge)
+  // RPM = 1000 * 11.1 * DutyCycle
+  float DC = (vel / 2000) * 100;          // DutyCycle = (Time ON / Period) * 100
+  float RPM = 1000 * 11.1 * DC;
+  
+  // Compute Lift
+  // Lift = (zAccel * mass) - Weight
+  float mass = 0.190;         // mass of the experimental system [g]
+  float g = 9.81;
+  float lift = (zAccel * mass) - (g * mass);
+
+  // Compute Torque
+
+  // Compute coefficients
+  kF = lift / (RPM * RPM); 
+
+}
+
 
 // -------------- LOGGER --------------
 void MPU6050::logger() {
+  /*
   Serial.print("\nAcc: [" + String(xAccel) + ", " + String(yAccel) + ", " + String(zAccel) + "]  \t");
   Serial.print("AngRates: [" + String(rollRate) + ", " + String(pitchRate) + ", " + String(yawRate) + "]\n");
+  */
+
+  Serial.print("\nAcc: [");
+  Serial.print(xAccel);
+  Serial.print(",");
+  Serial.print(yAccel);
+  Serial.print(",");
+  Serial.print(zAccel);
+  Serial.print("] \t");
+  Serial.print("AngRates: [");
+  Serial.print(rollRate);
+  Serial.print(",");
+  Serial.print(pitchRate);
+  Serial.print(",");
+  Serial.print(yawRate);
+  Serial.print("]\n");
+  
 }
 
 

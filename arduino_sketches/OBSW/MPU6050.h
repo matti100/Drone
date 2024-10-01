@@ -49,6 +49,9 @@ public:
   float pitchRate;
   float yawRate;
 
+  float kF;
+  float kM;
+
   // FUNCTIONS
   MPU6050();
   void init(int accelSensitivityOption, int gyroSensitivityOption, int clock);
@@ -57,6 +60,9 @@ public:
   void gyro_meas();
   void process_signals();
   void get_meas();
+
+  void computeLiftTorqueCoefficients(float vel);
+
   Sensitivity accLSB_manager(int accelSensitivityOption);
   Sensitivity gyroLSB_manager(int gyroSensitivityOption);
   void logger();

@@ -40,8 +40,7 @@ int vel = 1000;
 void loop() {
 
   IMU.get_meas();
-
-  IMU.logger();
+  // IMU.logger();
 
 /* 
   vel = analogRead(A0);
@@ -54,16 +53,21 @@ void loop() {
     // Convert the inpunt string in a number
     vel = inputString.toInt();
 
-    // Print the input number
-    Serial.print("Numero ricevuto: ");
-    Serial.println(vel);
-
     // Input string and flag reset
     inputString = "";
     stringComplete = false;
   }
 
   esc.writeMicroseconds(vel);
+
+  // TESTING
+  IMU.computeLiftTorqueCoefficients(vel);
+  Serial.print("zAccel:");
+  Serial.print(IMU.zAccel);
+  Serial.print("\tInput command:");
+  Serial.print(vel / 1000);
+  Serial.print("\tLift Coefficients:");
+  Serial.println(IMU.kF);
 }
 
 
@@ -81,5 +85,6 @@ void serialEvent() {
     }
   }
 }
+
 
 
