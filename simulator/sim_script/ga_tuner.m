@@ -1,7 +1,7 @@
 function tunedGains = ga_tuner(Drone, pop_size, maxGen, mutation_rate, kMax, tol)
 
 % Starting Parallel computing
-parpool("Processes");
+parpool("Processes", 8);
 
 % Random popolation intialization
 pop = rand(pop_size, 18) .* kMax;
@@ -95,7 +95,7 @@ end
 % Select random parent from population
 function selected = roulette_selection(pop, fitness)
 fitness(fitness == 0) = 1e-6;  % Avoid division by zero
-prob = (fitness) ./ (sum(fitness));     % Calcola la probabilità di ogni individuo
+prob = (1./fitness) ./ (sum(1./fitness));     % Calcola la probabilità di ogni individuo
 cumprob = cumsum(prob);              % Distribuzione cumulativa
 r = rand();                          % Numero casuale tra 0 e 1
 selected = pop(find(cumprob >= r, 1), :);  % Seleziona un individuo
