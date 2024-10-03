@@ -15,13 +15,12 @@ dJ_dk = zeros(18,1);
 % Gradient optimization method
 iter = 0;
 err_grad = tol + 1;
-dk = 0.0001;
+dk = 0.1;
 while iter < maxIter && err_grad > tol
     iter = iter +1;
     
     % Compute gradient of the cost function
-    J = cost_function(kP, kI, kD, Drone);
-
+    J = 
     for (j = 1:length(k))
         k2 = k;
         k2(j) = k2(j) + dk;
@@ -30,26 +29,27 @@ while iter < maxIter && err_grad > tol
         kD2 = k2(13:18);
 
         J2 = cost_function(kP2, kI2, kD2, Drone);
+        J = cost_function(kP, kI, kD, Drone);
         dJ = J2 - J;
 
         dJ_dk(j) = dJ / dk;
     end
 
     % Update k
+    k_prev = k;
     k = k - alpha.*dJ_dk;
 
-    % Update gains structure
-    kP = k(1:6);
-    kI = k(7:12);
-    kD = k(13:18);
-
     % Error gradient method
-    % err_grad = max(abs(k - k_prev));
-    err_grad = J;
+    err_grad = max(abs(k - k_prev));
 
     logger(iter, k, err_grad);
 
 end
+
+% Update gains structure
+kP = k(1:6);
+kI = k(7:12);
+kD = k(13:18);
 
 gains = gainBuilder(kP, kI, kD);
 
@@ -62,10 +62,23 @@ tunedGains = gains;
 
         % Initialize drone
         Drone.updateGains(g);
+        
+        % Initialize cost function
+        v = [];
 
         % Simulation
         for i = 1:length(Drone.tvec)-1
             Drone.updateState();
+
+            % Cost function computation
+            % % Integral of Squared Error (ISE)
+            % % J = integral( sum_i ( err_i^2 ) ), i = 1...6 pid
+            % 
+            % Err = [Drone.err_x; Drone.err_y; Drone.err_z; Drone.err_phi; Drone.err_theta; Drone.err_psi];
+            % Err = Err.^2;
+            % err = sum(Err);
+            % 
+            % v = [v; err];
         end
 
             % Mean Square Error (MSE)
@@ -76,20 +89,20 @@ tunedGains = gains;
             err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
             err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
 
-            % error = [Drone.err_x; Drone.err_y; Drone.err_z; Drone.err_phi; Drone.err_theta; Drone.err_psi];
+            % err = [Drone.err_x; Drone.err_y; Drone.err_z; Drone.err_phi; Drone.err_theta; Drone.err_psi];
             error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
             error = error.^2;
             MSE = mean(error);
 
             % Lyapunov Function derivative
             dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
-            % dV = Drone.dV
 
             V_dot = max(dV, zeros(size(dV)));
             V_dot = sum(V_dot);
-            V_dot = 0;
 
-            % Cost function
+            % % Trapezium integral method
+            % J = 0.5*Drone.dt*( v(1) + v(end) ) + Drone.dt*sum( v(2:end-1) );
+
             J = MSE + V_dot;
     end
 

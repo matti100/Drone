@@ -52,7 +52,7 @@ plot_flag = 1;               % 1 -> plot                0 -> no plot
 anim_flag = 0;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
-tuner_flag = 2;         % 1 -> Gradient Descent optimization
+tuner_flag = 1;         % 1 -> Gradient Descent optimization
                         % 2 -> Genetic Algorithm
                         % 0 -> no tuning
 
@@ -71,7 +71,7 @@ if (tuner_flag == 1)
 
     maxIter = 10000;
     tol = 1e-2;
-    alpha = 0.0001;
+    alpha = 1e-5;
 
     k0 = rand(6,3); %[kP, kI, kD]
 
@@ -115,12 +115,6 @@ else
     disp('-----------------------------------');
     disp('------------ Simulation -----------');
     disp('-----------------------------------');
-
-    if (tuner_flag == 1)
-        load('tunedGains_gradient');
-    elseif (tuner_flag == 2)
-        load('tunedGains_ga');
-    end
     
     % Manual tuning
     kP = [20;        % -> kP_T
@@ -145,12 +139,13 @@ else
           1];       % -> kD_Y
 
     gains = gainBuilder(kP, kI, kD);
-
-    % gains = tunedGains;
+    
+    load('tunedGains_ga.mat');
+    gains = tunedGains;
 
     % Initialize Drone
     Drone = Drone(params, x0, desideredState, gains, tspan);
-    Drone.linearizeHover();
+    % Drone.linearizeHover();
 
     % Simulation
     for i = 1:length(tvec)-1
