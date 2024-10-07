@@ -1,53 +1,49 @@
 #include "MPU6050.h"
-#include <Wire.h>
+#include "BLDC.h"
+// #include <Wire.h>
 
-#include <Servo.h>
+
+// #include <Servo.h>
 
 MPU6050 IMU;
-Servo esc;
+BLDC Motors;
+
+//Servo esc;
 
 void setup() {
   Serial.begin(9600);
 
   int sensitivity = 1;        // +/- 4g     +/- 500 deg/s
   int clock = 400000;         // [Hz]
+  int initialSignal = 0;      // PWM
 
   Serial.print("\n\n----------------\n");
   Serial.print("IMU INITIALIZATION");
   Serial.print("\n----------------\n");
   IMU.init(sensitivity, sensitivity, clock);
+  Motors.init(initialSignal);
   Serial.print("\nINITIALIZATION COMPLETE");
 
   Serial.print("\n\n----------------\n");
   Serial.print("IMU CALIBRATION");
   Serial.print("\n----------------\n");
   IMU.calibration();
-  Serial.print("CALIBRATION COMPLETE");
+  Serial.print("IMU CALIBRATION COMPLETE");
 
   Serial.print("\n\n----------------\n");
-  Serial.print("ACQUISITION");
+  Serial.print("DATA ACQUISITION");
   Serial.print("\n----------------\n");
-
-  esc.attach(11);
-
 }
 
 String inputString = "";
 bool stringComplete = false;
 int vel = 1000;
 
-
 void loop() {
 
   IMU.get_meas();
-  // IMU.logger();
 
-/* 
-  vel = analogRead(A0);
-  vel = map(vel, 0, 1024, 1000, 2000);
-  Serial.print(vel);
-*/
-
+  Motors.setVelocity(vel, vel, vel, vel);
 
   if (stringComplete) {
     // Convert the inpunt string in a number
@@ -58,16 +54,14 @@ void loop() {
     stringComplete = false;
   }
 
-  esc.writeMicroseconds(vel);
-
-  // TESTING
   IMU.computeLiftTorqueCoefficients(vel);
   Serial.print("zAccel:");
   Serial.print(IMU.zAccel);
   Serial.print("\tInput command:");
-  Serial.print(vel / 1000);
+  Serial.print(vel);
   Serial.print("\tLift Coefficients:");
   Serial.println(IMU.kF);
+  delay(100);
 }
 
 
@@ -86,5 +80,13 @@ void serialEvent() {
   }
 }
 
+/*
+
+void logger(MPU6050 IMU, BLDC motor1, BLDC motor2, BLDC motor3, BLDC motor4) {
+
+
+
+}
+*/
 
 
