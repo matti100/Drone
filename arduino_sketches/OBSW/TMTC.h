@@ -1,11 +1,11 @@
-#include <iterator>
+
 #ifndef TMTC_h
 
 #define TMTC_h
 
 // ---------------- LIBRARIES --------------
-#include <HTTPClient.h>
 #include <WebServer.h>
+#include <HTTPClient.h>
 
 // ---------------- CLASS DEFINITION --------------
 class TMTC {
@@ -28,7 +28,7 @@ public:
 
   // FUNCTIONS
   TMTC();
-  void wifi_init(char* ssid, char* psw, int serverPort, char* url);
+  void wifi_init(const char* ssid, const char* psw, const int serverPort, const char* url);
   void bluetooth_init();
 
   void receiveData();

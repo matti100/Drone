@@ -5,7 +5,6 @@
 #define BLDC_h
 
 // ---------------- LIBRARIES --------------
-#include <Arduino.h>
 
 // ---------------- CLASS DEFINITION --------------
 class BLDC {

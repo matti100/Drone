@@ -1,12 +1,10 @@
 #include "MPU6050.h"
 #include "BLDC.h"
-// #include <Wire.h>
-
-
-// #include <Servo.h>
+#include "TMTC.h"
 
 MPU6050 IMU;
 BLDC Motors;
+TMTC esp32;
 
 //Servo esc;
 

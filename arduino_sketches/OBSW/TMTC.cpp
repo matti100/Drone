@@ -11,14 +11,14 @@ TMTC::TMTC(){
 
 // -------------- INITIALIZATION --------------
 // -------------- WIFI Initialization --------------
-void TMTC::wifi_init(char* ssid, char* psw, int serverPort, char* url) {
+void TMTC::wifi_init(const char* ssid, const char* psw, const int serverPort, const char* url) {
 
   // Initialize Wifi connection
   WiFi.begin(ssid, psw);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
-    Serial.println("Connessione in corso...");
+    Serial.println("Connection...");
   }
 
   Serial.print("Connected to Wi-Fi:\t");
@@ -29,8 +29,9 @@ void TMTC::wifi_init(char* ssid, char* psw, int serverPort, char* url) {
   // Initialize Server
   server.begin(serverPort);
 
-  // Initialize URL
+  // Begin connection
   URL = url;
+  http.begin(URL);
 
 }
 
@@ -45,7 +46,7 @@ void TMTC::sendData(float* accel, float* gyro, float* motorSpeed) {
   if (WiFi.status() == WL_CONNECTED) {
     
     // Begin connection
-    http.begin(URL);
+    // http.begin(URL);
 
     // Create JSON object
     StaticJsonDocument<200> doc;
@@ -82,7 +83,7 @@ void TMTC::sendData(float* accel, float* gyro, float* motorSpeed) {
     }
 
     // End connection
-    http.end();
+    // http.end();
 
   } else {
     Serial.println("Not connected");
@@ -91,6 +92,8 @@ void TMTC::sendData(float* accel, float* gyro, float* motorSpeed) {
 }
 
 void TMTC::receiveData() {
+
+  server.handleClient();
   
   if (server.hasArg("plain")) {  // Verifica se ci sono dati nella richiesta
     String jsonData = server.arg("plain");  // Estrai i dati JSON
