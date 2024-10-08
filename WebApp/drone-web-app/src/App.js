@@ -1,42 +1,76 @@
+// ------------------------------------
 // -------------- IMPORT --------------
+// ------------------------------------
 import './App.css';
 import React, { useEffect, useState } from 'react';
 
-// -------------- VARIABLES --------------
-const [data, setData] = useState(null);
-const [error, setError] = useState(null);
-
-// -------------- FUNCTIONS --------------
-  // Funzione per ottenere i dati dal server
-  const fetchData = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/data');  // URL del server Node.js
-      if (!response.ok) {
-        throw new Error('Errore nella richiesta');
-      }
-      const jsonData = await response.json();
-      setData(jsonData);  // Imposta i dati ricevuti
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  // Effettua la richiesta quando il componente viene caricato
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-
 // -------------- WEB-APP --------------
 function App() {
+
+  // ---------------------------------------
+  // -------------- VARIABLES --------------
+  // ---------------------------------------
+
+  /******* STATES *******/
+  // Speed
+  const [speed, setSpeed] = useState(0);
+  const [inputSpeed, setInputSpeed] = useState("");
+  const [jsonData, setJsonData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+
+  // ---------------------------------------
+  // -------------- FUNCTIONS --------------
+  // ---------------------------------------
+  const handleSpeed = (event) => {
+    setInputSpeed(event.target.value);
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    setSpeed(inputSpeed);
+    console.log(speed);
+  };
+
+  
+
+  /******* SERVER COMMUNICATION *******/
+  useEffect(() => {
+    fetch('http://localhost:3000')
+      .then(response => {
+        return response.json();
+      })
+      .then(jsonData => {
+        setJsonData(jsonData);
+        setLoading(false);
+        console.log(jsonData);
+      })
+      .catch(err => {
+        Error("Error in the communication");
+        setLoading(false);
+      })
+  });
+
+  // ---------------------------------
+  // -------------- APP --------------
+  // ---------------------------------
   return (
     <div className="App">
-      <div className="controPanel">
+      <div className="controlPanel">
         <h1>Drone Control panel</h1>
-        <form>
+
+        <form onSubmit={handleSubmit}>
           <label>Insert input commands</label>
-          <input type="number"></input>
+          <input
+            type="number"
+            onChange={handleSpeed}
+            value={inputSpeed}></input>
+          <button type="submit">Send</button>
         </form>
+
+        
+
       </div>
     </div>
   );
