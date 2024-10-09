@@ -1,59 +1,80 @@
 // -------------------------------------
 // -------------- MODULES --------------
 // -------------------------------------
-const express = require('express');
+const express = require("express");
+const cors = require("cors");
 
 // -----------------------------------------------
 // -------------- INITIALIZE SERVER --------------
 // -----------------------------------------------
 const app = express();
-const port = 3000;
+const port = 3001;
+
+// ---------------------------------------
+// -------------- VARIABLES --------------
+// ---------------------------------------
+var connectionFlag;
+var speed;
+
 
 // -----------------------------------------
 // -------------- MIDDLEWARES --------------
 // -----------------------------------------
 
-// Handles JSON data
+// JSON file handler
 app.use(express.json());
+// cors permits client-server communication through different ports
+app.use(cors());
 
-// Handles connection to device
-app.use((req, res, next) => {
+// --------------------------------------
+// -------------- REQUESTS --------------
+// --------------------------------------
 
-  var flag = req.body;
+/* POST */
+// Update Speed
+app.post('/updateSpeed', (req, res) => {
 
-  if (!flag.connection) {
-    console.log("Connection lost!\nConnecting to source...");
-  } else {
-    next();
-  }
+    speed = req.body.speed;
+    console.log("Speed received: " + speed);
+
+    res.send(JSON.stringify({"message": "Speed updated successfully"}));
 });
 
-// ---------------------------------------------------
-// -------------- POST REQUEST HANDLING --------------
-// ---------------------------------------------------
 
-/*******  Data from sensors *******/
-app.post('/data', (req, res) => {
+// Manage connnection status
+app.post('/stopConnection', (req, res) => {
 
-  const jsonData = req.body;
-  
-  // Print on terminal
-  console.log('Dati JSON ricevuti:', jsonData);
-  
-  // Send response 
-  res.send('Dati ricevuti con successo!');
-});
+    connectionFlag = req.body.flag;
+    if (connectionFlag){
+        console.log("Connection established");
+    } else {
+        console.log("Connection stopped");
+    }
 
-// --------------------------------------------------
-// -------------- GET REQUEST HANDLING --------------
-// --------------------------------------------------
-app.get('/', (req, res) => {
-  res.send("Ciao a tutti");
+    res.send(JSON.stringify({"message": "Connection stopped successfully"}));
 })
 
-// -------------------------------------------
-// -------------- LAUNCH SERVER --------------
-// -------------------------------------------
+/* GET */
+// Manage connection status
+app.get('/', (req, res) => {
+    /* 
+    if (connectionFlag == false) {
+        console.log("Connecting...");
+    } else {
+        console.log("Connection established !"); 
+    }
+    */ 
+
+    res.send(JSON.stringify({"connection": connectionFlag}));
+})
+
+
+
 app.listen(port, () => {
-  console.log(`Server avviato su http://localhost:${port}`);
+    console.log("Server listening on http://localhost:" + port);
 });
+
+
+
+
+
