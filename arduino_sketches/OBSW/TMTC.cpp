@@ -13,7 +13,7 @@ TMTC::TMTC(){
 // -------------- WIFI Initialization --------------
 void TMTC::wifi_init(const char* ssid, const char* psw, const int serverPort, const char* url) {
 
-  // Initialize Wifi connection
+  // Initialize WiFi connection
   WiFi.begin(ssid, psw);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -26,27 +26,25 @@ void TMTC::wifi_init(const char* ssid, const char* psw, const int serverPort, co
   Serial.print("ESP32 IP:\t");
   Serial.println(WiFi.localIP());
 
-  // Initialize Server
+  // Initialize Server (for GET requests)
+  server.on("/data", HTTP_POST, [this]() {
+    this -> receiveData();
+  });
   server.begin(serverPort);
 
-  // Begin connection
+  // Initialize HTTP connection (for POST requests)
   URL = url;
   http.begin(URL);
-
 }
 
 // -------------- BLUETOOTH INITIALIZATION --------------
 void TMTC::bluetooth_init() {
-
 }
 
 // -------------- WIFI --------------
 void TMTC::sendData(float* accel, float* gyro, float* motorSpeed) {
 
   if (WiFi.status() == WL_CONNECTED) {
-    
-    // Begin connection
-    // http.begin(URL);
 
     // Create JSON object
     StaticJsonDocument<200> doc;
@@ -82,32 +80,26 @@ void TMTC::sendData(float* accel, float* gyro, float* motorSpeed) {
       Serial.println("Error during POST request");
     }
 
-    // End connection
-    // http.end();
-
   } else {
-    Serial.println("Not connected");
+    Serial.println("ERROR: WiFi connection failed");
   }
 
 }
 
+/* 
 void TMTC::receiveData() {
-
-  server.handleClient();
-  
-  if (server.hasArg("plain")) {  // Verifica se ci sono dati nella richiesta
-    String jsonData = server.arg("plain");  // Estrai i dati JSON
-    Serial.println("Dati ricevuti: " + jsonData);
+  // Verify if request has "plain text" data type (JSON string)
+  if (server.hasArg("plain")) { 
+    // Extract JSON
+    String jsonData = server.arg("plain");
+    Serial.println("Received data: " + jsonData);
 
     // Extract data from JSON
     StaticJsonDocument<200> doc;
     DeserializationError error = deserializeJson(doc, jsonData);
 
     if (!error) {
-      int inputCMD = doc["motore"];
-
-      Serial.println("InputCMD: \t");
-      Serial.println(inputCMD);
+      inputCMD = doc["speed"];
 
       // Answer to client 
       server.send(200, "application/json", "{\"status\":\"ok\"}");
@@ -115,7 +107,28 @@ void TMTC::receiveData() {
       server.send(400, "application/json", "{\"status\":\"error\", \"message\":\"Invalid JSON\"}");
     }
   }
+}
+*/ 
 
+void TMTC::receiveData() {
+  // Extract JSON string
+  String jsonData = server.arg("plain"); // text plain data type (JSON string)
+
+  // Extract JSON data
+  StaticJsonDocument<200> doc;
+  deserializeJson(doc, jsonData);
+
+  inputCMD = doc["speed"];
+
+  Serial.println(inputCMD);
+
+  // Send response to client
+      server.send(200, "application/json", "{\"message\":\"ESP32 received data successfully\"}");
+}
+
+
+void TMTC::handleClient() {
+  server.handleClient();
 }
 
 // -------------- BLUETOOTH --------------

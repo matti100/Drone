@@ -17,14 +17,16 @@ private:
   // VARIABLES
 
   // OBJECTS
-  WebServer server;
   HTTPClient http;
-
-
 
 public:
 
   // VARIABLES
+  int inputCMD;
+
+  // OBJECTS
+  WebServer server;
+
 
   // FUNCTIONS
   TMTC();
@@ -33,7 +35,7 @@ public:
 
   void receiveData();
   void sendData(float* accel, float* gyro, float* motorSpeed);
-
+  void handleClient();
 };
 
 
