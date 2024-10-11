@@ -35,14 +35,12 @@ void setup() {
 
 String inputString = "";
 bool stringComplete = false;
-int vel = 1000;
+int vel = 0;
 
 
 void loop() {
 
   IMU.get_meas();
-
-  Motors.setVelocity(vel, vel, vel, vel);
 
   if (stringComplete) {
     // Convert the inpunt string in a number
@@ -51,7 +49,11 @@ void loop() {
     // Input string and flag reset
     inputString = "";
     stringComplete = false;
+
+    vel = 255/100 * vel;
   }
+
+  Motors.setVelocity(vel, vel, vel, vel);
 
   IMU.computeLiftTorqueCoefficients(vel);
   Serial.print("zAccel:");
@@ -82,8 +84,6 @@ void serialEvent() {
 /*
 
 void logger(MPU6050 IMU, BLDC motor1, BLDC motor2, BLDC motor3, BLDC motor4) {
-
-
 
 }
 */
