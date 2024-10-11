@@ -134,6 +134,8 @@ classdef Drone < handle
         traj            % [tx12]         Time evolution of the state
 
         %% Linearization
+        linear;         % flag
+
         A; 
         B;
         C;
@@ -151,7 +153,7 @@ classdef Drone < handle
     methods
 
         %% Constructor
-        function obj = Drone(params, initialCondition, desideredState, gains, tspan)
+        function obj = Drone(params, initialCondition, desideredState, gains, tspan, linear)
             
             % Params
             obj.m = params.m;
@@ -246,6 +248,12 @@ classdef Drone < handle
 
             obj.traj = obj.x0';
 
+            % Linearization
+            obj.linear = linear;
+            if (obj.linear ~= 0)
+                obj.linearizeHovering();
+            end
+
             % Lyapunov function
             [obj.V, obj.dV] = lyapunov(obj, 0);
 
@@ -307,7 +315,7 @@ classdef Drone < handle
             % Rotation matrix from o -> b
             o_R_b = R_psi * R_theta * R_phi;
             % Rotation matrix from b -> o
-            o_R_b = o_R_b';
+            % o_R_b = o_R_b';
         end
 
         function obj = ODEs(obj)
@@ -316,8 +324,8 @@ classdef Drone < handle
             %              x(4);
             %              x(5);
             %              x(6);
-            %              (k_f/m)*(sin(x(9))*sin(x(7)) - cos(x(9))*sin(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2);
-            %              (k_f/m)*(-cos(x(9))*sin(x(7)) - sin(x(9))*sin(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2);
+            %              (k_f/m)*(sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2);
+            %              (k_f/m)*(-cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2);
             %              (k_f/m)*(cos(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2) - g;
             %              x(10);
             %              x(11);
@@ -326,39 +334,43 @@ classdef Drone < handle
             %              (L*k_f/b)*(u(2)^2 - u(1)^2) + ((c-a)/b)*x(10)*x(12);
             %              (k_m/c)*(u(1)^2 + u(2)^2 - u(3)^2 - u(4)^2) + ((a-b)/c)*x(10)*x(11);
             %              ];
-
-            obj.o_R_b = obj.evalRotationMatrix(obj.att);
-
-            obj.dx(1:3) = obj.dr;
-            obj.dx(4:6) = ( (1/obj.m) .* obj.o_R_b * obj.F ) + [0; 0; -obj.g];
-            obj.dx(7:9) = obj.w;
-            obj.dx(10:12) = obj.I \ (obj.M - cross(obj.w, obj.I*obj.w));
+            
+            if (abs(obj.linear) == 1)
+                obj.dx = obj.A*obj.x + obj.B*obj.u;
+            else
+                obj.o_R_b = obj.evalRotationMatrix(obj.att);
+                obj.dx(1:3) = obj.dr;
+                obj.dx(4:6) = ( (1/obj.m) .* obj.o_R_b * obj.F ) + [0; 0; -obj.g];
+                obj.dx(7:9) = obj.w;
+                obj.dx(10:12) = obj.I \ (obj.M - cross(obj.w, obj.I*obj.w));
+            end
 
         end
 
         %% CMD computation
         function obj = motorCMD(obj)
-            obj.T = obj.altitudeCtrl();         % -> T
-            obj.attDes(1) = obj.phiCtrl();      % -> phi_des
-            obj.attDes(2) = obj.thetaCtrl();    % -> theta_des
-            obj.R = obj.RCtrl();                % -> R
-            obj.P = obj.PCtrl();                % -> P
-            obj.Y = obj.YCtrl();                % -> Y
 
             % MMA
-            % % obj.u_lin = -obj.K; % * (obj.xDes - obj.x);
-            % obj.u_lin = zeros(4,1);
-            % 
-            % obj.u1 = obj.u_lin(1) + (obj.T + obj.R + obj.P + obj.Y);
-            % obj.u2 = obj.u_lin(2) + (obj.T - obj.R - obj.P + obj.Y);
-            % obj.u3 = obj.u_lin(3) + (obj.T - obj.R + obj.P - obj.Y);
-            % obj.u4 = obj.u_lin(4) + (obj.T + obj.R - obj.P - obj.Y);
+            if (obj.linear > 0)
+                obj.u_lin = obj.K * (obj.xDes - obj.x);
+                obj.u1 = obj.u_lin(1);
+                obj.u2 = obj.u_lin(2);
+                obj.u3 = obj.u_lin(3);
+                obj.u4 = obj.u_lin(4);
+            else
+                obj.T = obj.altitudeCtrl();         % -> T
+                obj.attDes(1) = obj.phiCtrl();      % -> phi_des
+                obj.attDes(2) = obj.thetaCtrl();    % -> theta_des
+                obj.R = obj.RCtrl();                % -> R
+                obj.P = obj.PCtrl();                % -> P
+                obj.Y = obj.YCtrl();                % -> Y
 
-            obj.u1 = obj.T + obj.R + obj.P + obj.Y;
-            obj.u2 = obj.T - obj.R - obj.P + obj.Y;
-            obj.u3 = obj.T - obj.R + obj.P - obj.Y;
-            obj.u4 = obj.T + obj.R - obj.P - obj.Y;
-
+                obj.u1 = obj.T + obj.R + obj.P + obj.Y;
+                obj.u2 = obj.T - obj.R - obj.P + obj.Y;
+                obj.u3 = obj.T - obj.R + obj.P - obj.Y;
+                obj.u4 = obj.T + obj.R - obj.P - obj.Y;
+            end
+            
             obj.u = [obj.u1; obj.u2; obj.u3; obj.u4];
         end
 
@@ -432,7 +444,7 @@ classdef Drone < handle
         end
 
         %% Linearization (around Hovering)
-        function obj = linearizeHover(obj)
+        function obj = linearizeHovering(obj)
 
             % Compute A-matrix
             obj.A = zeros(12,12);
@@ -440,9 +452,9 @@ classdef Drone < handle
             obj.A(2, 5) = 1;
             obj.A(3, 6) = 1;
             obj.A(4, 7) = obj.g*sin(obj.attDes(3));
-            obj.A(4, 8) = -obj.g*cos(obj.attDes(3));
+            obj.A(4, 8) = obj.g*cos(obj.attDes(3));
             obj.A(5, 7) = -obj.g*cos(obj.attDes(3));
-            obj.A(5, 8) = -obj.g*sin(obj.attDes(3));
+            obj.A(5, 8) = obj.g*sin(obj.attDes(3));
             obj.A(7, 10) = 1;
             obj.A(8, 11) = 1;
             obj.A(9, 12) = 1;

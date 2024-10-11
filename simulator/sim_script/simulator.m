@@ -7,23 +7,30 @@ params = struct();
 
 % Inertial Data:
 params.m = 1.25;            % [Kg]              % Mass
+params.m = 0.8;
 params.Ix = 0.0232;          % [Kg / m^2]        % Principal Moment of Inertia X
-params.Iy = 0.0232;         % [Kg / m^2]        % Principal Moment of Inertia x
+params.Ix = 15.67*1e-3;
+params.Iy = 0.0232;         % [Kg / m^2]        % Principal Moment of Inertia Y
+params.Iy = 15.67*1e-3;
 params.Iz = 0.0468;         % [Kg / m^2]        % Principal Moment of Inertia Z
+params.Iz = 28.34*1e-3;
 params.I = diag([params.Ix, params.Iy, params.Iz]);
 % Principal Inertia Matrix
 
 % Geometric Data
 params.armLength = 0.265;   % [m]                % Arm length
+params.armLength = 0.3;
 params.bodySize = 0.2;      % [m]                % body size
 params.rotRad = 0.1;        % [m]                % rotor radius
 
 % Torque and Lift Coefficients
 k_f = 6.11e-8;   % [N / rpm]         % Lift Coefficient
 params.k_f = 0.02;
+params.k_f = 192.32*1e-7;
 % params.k_f = (k_f)*60/6.28;                % [N/rad/s]
 k_m = 1.5e-9;    % [N*m / rpm]       % Torque Coefficient
 params.k_m = 0.01;
+params.k_m = 4.003*1e-7;
 % params.k_m = (k_m)*60/6.28;                % [N/rad/s]
 
 % Gravitational Data
@@ -34,12 +41,14 @@ params.dt = 0.01;       % [s]                % Time interval
 
 % Initial Condition
 x0 = zeros(12,1);
-% x0(1) = 1;
+x0(3) = 2.01;
+x0(7) = 0.2;
+x0(8) = -0.2;
 
 % Desidered Position
 desideredState = struct();
 desideredState.rDes = [0, 0, 2]';      % [m]
-desideredState.attDes = [0, 0, pi/2]';
+desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
@@ -47,12 +56,18 @@ tmax = 20;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
+% Linearize around hovering flag
+linear = 0;            % 0 -> no linearization (PID + non-linear dynamics)
+                       % 1 -> linearization (LQR + linear dynamics)
+                       % 2 -> use LQR control for non-linear dynamics
+                       % -1 -> use PID controller for linear dynamics
+
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
 anim_flag = 0;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
-tuner_flag = 1;         % 1 -> Gradient Descent optimization
+tuner_flag = 0;         % 1 -> Gradient Descent optimization
                         % 2 -> Genetic Algorithm
                         % 0 -> no tuning
 
@@ -84,8 +99,7 @@ if (tuner_flag == 1)
 
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
 
-    Drone = Drone(params, x0, desideredState, gains, tspan);
-    % Drone.linearizeHover();
+    Drone = Drone(params, x0, desideredState, gains, tspan, 0);
 
     tunedGains = PID_tuner(Drone, k0, maxIter, tol, alpha);
 
@@ -104,8 +118,7 @@ elseif (tuner_flag == 2)
 
     k0 = zeros(6,3);
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
-    Drone = Drone(params, x0, desideredState, gains, tspan);
-    % Drone.linearizeHover();
+    Drone = Drone(params, x0, desideredState, gains, tspan, 0);
 
     tunedGains = ga_tuner(Drone, pop_size, maxGen, mutation_rate, kMax, tol);
 
@@ -117,35 +130,34 @@ else
     disp('-----------------------------------');
     
     % Manual tuning
-    kP = [20;        % -> kP_T
-          1;        % -> kP_phi
-          1;        % -> kP_theta
-          0;        % -> kP_R
-          1;        % -> kP_P
-          10];       % -> kP_Y
+    kP = [350;        % -> kP_T
+          0;        % -> kP_phi
+          0;        % -> kP_theta
+          50;        % -> kP_R
+          0;        % -> kP_P
+          0];       % -> kP_Y
 
-    kI = [5;        % -> kI_T        
+    kI = [120;        % -> kI_T        
           0;        % -> kI_phi
           0;        % -> kI_theta
-          0;        % -> kI_R
+          10;        % -> kI_R
           0;        % -> KI_P
           0];       % -> KI_Y
 
-    kD = [20;        % -> kD_T
+    kD = [300;        % -> kD_T
           0;        % -> kD_phi
           0;        % -> kD_theta
-          0;        % -> kD_R
+          35;        % -> kD_R
           0;        % -> kD_P
-          1];       % -> kD_Y
+          0];       % -> kD_Y
 
     gains = gainBuilder(kP, kI, kD);
     
     load('tunedGains_ga.mat');
-    gains = tunedGains;
+    % gains = tunedGains;
 
     % Initialize Drone
-    Drone = Drone(params, x0, desideredState, gains, tspan);
-    % Drone.linearizeHover();
+    Drone = Drone(params, x0, desideredState, gains, tspan, linear);
 
     % Simulation
     for i = 1:length(tvec)-1
@@ -169,6 +181,7 @@ if (plot_flag)
     xlabel('Time [s]');
     ylabel('Trajectory [m]');
     title('Trajectory of the drone');
+    ylim([-10, 10])
     
     subplot(2,2,2)
     plot(tvec, Drone.V);
@@ -186,6 +199,7 @@ if (plot_flag)
     ylabel('attitude [rad]');
     legend('phi', 'theta', 'psi');
     title('Attitude of the drone');
+    % ylim([-10, 10]);
 
     if (anim_flag)
 
