@@ -1,7 +1,7 @@
 function tunedGains = PID_tuner(Drone, k0, maxIter, tol, alpha)
 
 % Start Parallel Computing
-% parpool("Processes", 8);
+parpool("Processes", 8);
 
 % Initial k values
 kP = k0(:, 1);
@@ -18,11 +18,11 @@ err_grad = tol + 1;
 dk = 0.0001;
 while iter < maxIter && err_grad > tol
     iter = iter +1;
-    
+
     % Compute gradient of the cost function
     J = cost_function(kP, kI, kD, Drone);
 
-    for (j = 1:length(k))
+    parfor (j = 1:length(k))
         k2 = k;
         k2(j) = k2(j) + dk;
         kP2 = k2(1:6);
@@ -55,51 +55,51 @@ gains = gainBuilder(kP, kI, kD);
 
 tunedGains = gains;
 
+end
+
 %% ----------- Functions --------------
 
-    function J = cost_function(kP, kI, kD, Drone)
-        g = gainBuilder(kP, kI, kD);
+function J = cost_function(kP, kI, kD, Drone)
+g = gainBuilder(kP, kI, kD);
 
-        % Initialize drone
-        Drone.updateGains(g);
+% Initialize drone
+Drone.updateGains(g);
 
-        % Simulation
-        for i = 1:length(Drone.tvec)-1
-            Drone.updateState();
-        end
+% Simulation
+for i = 1:length(Drone.tvec)-1
+    Drone.updateState();
+end
 
-            % Mean Square Error (MSE)
-            err_x = Drone.err_x(~isnan(Drone.err_x) & ~isinf(Drone.err_x));
-            err_y = Drone.err_y(~isnan(Drone.err_y) & ~isinf(Drone.err_y));
-            err_z = Drone.err_z(~isnan(Drone.err_z) & ~isinf(Drone.err_z));
-            err_phi = Drone.err_phi(~isnan(Drone.err_phi) & ~isinf(Drone.err_phi));
-            err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
-            err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
+% Mean Square Error (MSE)
+err_x = Drone.err_x(~isnan(Drone.err_x) & ~isinf(Drone.err_x));
+err_y = Drone.err_y(~isnan(Drone.err_y) & ~isinf(Drone.err_y));
+err_z = Drone.err_z(~isnan(Drone.err_z) & ~isinf(Drone.err_z));
+err_phi = Drone.err_phi(~isnan(Drone.err_phi) & ~isinf(Drone.err_phi));
+err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
+err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
 
-            % error = [Drone.err_x; Drone.err_y; Drone.err_z; Drone.err_phi; Drone.err_theta; Drone.err_psi];
-            error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
-            error = error.^2;
-            MSE = mean(error);
+% error = [Drone.err_x; Drone.err_y; Drone.err_z; Drone.err_phi; Drone.err_theta; Drone.err_psi];
+error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
+error = error.^2;
+MSE = mean(error);
 
-            % Lyapunov Function derivative
-            dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
-            % dV = Drone.dV
+% Lyapunov Function derivative
+dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
+% dV = Drone.dV
 
-            V_dot = max(dV, zeros(size(dV)));
-            V_dot = sum(V_dot);
-            V_dot = 0;
+V_dot = max(dV, zeros(size(dV)));
+V_dot = sum(V_dot);
+V_dot = 0;
 
-            % Cost function
-            J = MSE + V_dot;
-    end
+% Cost function
+J = MSE + V_dot;
+end
 
-    function logger(iter, k, err_grad)
-        fprintf("Iteration n. %d\t| ", iter);
-        fprintf("Error = %f | ", err_grad);
+function logger(iter, k, err_grad)
+fprintf("Iteration n. %d\t| ", iter);
+fprintf("Error = %f | ", err_grad);
 
-        fprintf("kP = [%f, %f, %f, %f, %f, %f] | ", k(1:6));
-        fprintf("kI = [%f, %f, %f, %f, %f, %f] | ", k(7:12));
-        fprintf("kD = [%f, %f, %f, %f, %f, %f]\n", k(13:18));
-    end
-
+fprintf("kP = [%f, %f, %f, %f, %f, %f] | ", k(1:6));
+fprintf("kI = [%f, %f, %f, %f, %f, %f] | ", k(7:12));
+fprintf("kD = [%f, %f, %f, %f, %f, %f]\n", k(13:18));
 end

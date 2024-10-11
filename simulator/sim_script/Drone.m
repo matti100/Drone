@@ -255,7 +255,12 @@ classdef Drone < handle
             end
 
             % Lyapunov function
-            [obj.V, obj.dV] = lyapunov(obj, 0);
+            Ek0 = 0.5 * obj.m * norm(obj.dr)^2;
+            Ep0 = obj.m * obj.g * obj.x(3);
+
+            V0 = Ek0 + Ep0;
+            
+            [obj.V, obj.dV] = lyapunov(obj, V0);
 
         end
 

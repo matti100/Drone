@@ -81,14 +81,15 @@ error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
 error = error.^2;
 MSE = mean(error);
 
-% Lyapunov Function derivative
-dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
-
-V_dot = max(dV, zeros(size(dV)));
-V_dot = sum(V_dot);
+% % Lyapunov Function derivative
+% dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
+% 
+% V_dot = max(dV, zeros(size(dV)));
+% V_dot = sum(V_dot);
 
 % Fitness function computation
-fitness = MSE + V_dot;
+% fitness = MSE + V_dot;
+fitness = MSE;
 
 end
 

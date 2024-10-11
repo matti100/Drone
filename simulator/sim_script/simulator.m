@@ -41,9 +41,9 @@ params.dt = 0.01;       % [s]                % Time interval
 
 % Initial Condition
 x0 = zeros(12,1);
-x0(3) = 2.01;
-x0(7) = 0.2;
-x0(8) = -0.2;
+x0(3) = 2.1;
+x0(7) = 0.4;
+x0(8) = 0.6;
 
 % Desidered Position
 desideredState = struct();
@@ -52,22 +52,22 @@ desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
-tmax = 20;              % [s]
+tmax = 10;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
 % Linearize around hovering flag
-linear = 0;            % 0 -> no linearization (PID + non-linear dynamics)
+linear = -1;            % 0 -> no linearization (PID + non-linear dynamics)
                        % 1 -> linearization (LQR + linear dynamics)
-                       % 2 -> use LQR control for non-linear dynamics
-                       % -1 -> use PID controller for linear dynamics
+                       % 2 -> LQR + non-linear dynamics
+                       % -1 -> (PID + linear dynamics)
 
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
 anim_flag = 0;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
-tuner_flag = 0;         % 1 -> Gradient Descent optimization
+tuner_flag = 2;         % 1 -> Gradient Descent optimization
                         % 2 -> Genetic Algorithm
                         % 0 -> no tuning
 
@@ -99,7 +99,7 @@ if (tuner_flag == 1)
 
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
 
-    Drone = Drone(params, x0, desideredState, gains, tspan, 0);
+    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
 
     tunedGains = PID_tuner(Drone, k0, maxIter, tol, alpha);
 
@@ -114,11 +114,11 @@ elseif (tuner_flag == 2)
     maxGen = 2000;
     tol = 1e-2;
     mutation_rate = 0.3;
-    kMax = 1e-2;
+    kMax = 1;
 
     k0 = zeros(6,3);
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
-    Drone = Drone(params, x0, desideredState, gains, tspan, 0);
+    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
 
     tunedGains = ga_tuner(Drone, pop_size, maxGen, mutation_rate, kMax, tol);
 
@@ -130,25 +130,25 @@ else
     disp('-----------------------------------');
     
     % Manual tuning
-    kP = [350;        % -> kP_T
-          0;        % -> kP_phi
+    kP = [150;        % -> kP_T
+          -3.3;        % -> kP_phi
           0;        % -> kP_theta
-          50;        % -> kP_R
-          0;        % -> kP_P
+          15;        % -> kP_R 50
+          -15;        % -> kP_P
           0];       % -> kP_Y
 
-    kI = [120;        % -> kI_T        
-          0;        % -> kI_phi
+    kI = [20;        % -> kI_T        
+          -7.7;        % -> kI_phi
           0;        % -> kI_theta
-          10;        % -> kI_R
-          0;        % -> KI_P
+          20;        % -> kI_R 10
+          -6;        % -> KI_P
           0];       % -> KI_Y
 
-    kD = [300;        % -> kD_T
-          0;        % -> kD_phi
+    kD = [100;        % -> kD_T
+          -0.85;        % -> kD_phi
           0;        % -> kD_theta
-          35;        % -> kD_R
-          0;        % -> kD_P
+          80;        % -> kD_R 35
+          -5;        % -> kD_P
           0];       % -> kD_Y
 
     gains = gainBuilder(kP, kI, kD);
@@ -199,7 +199,7 @@ if (plot_flag)
     ylabel('attitude [rad]');
     legend('phi', 'theta', 'psi');
     title('Attitude of the drone');
-    % ylim([-10, 10]);
+    ylim([-0.3, 0.3]);
 
     if (anim_flag)
 
