@@ -59,7 +59,7 @@ tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
 % Linearize around hovering flag
-linear = -1;            % 0 -> no linearization (PID + non-linear dynamics)
+linear = 0;            % 0 -> no linearization (PID + non-linear dynamics)
                        % 1 -> linearization (LQR + linear dynamics)
                        % 2 -> LQR + non-linear dynamics
                        % -1 -> (PID + linear dynamics)

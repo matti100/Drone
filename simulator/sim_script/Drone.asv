@@ -363,12 +363,17 @@ classdef Drone < handle
                 obj.u3 = obj.u_lin(3);
                 obj.u4 = obj.u_lin(4);
             else
-                obj.u1 = obj.altitudeCtrl();         % -> T
+                obj.T = obj.altitudeCtrl();         % -> T
                 obj.attDes(1) = obj.phiCtrl();      % -> phi_des
                 obj.attDes(2) = obj.thetaCtrl();    % -> theta_des
-                obj.u2 = obj.RCtrl();                % -> U2 = Mx
-                obj.u3 = obj.PCtrl();                % -> U3 = My
-                obj.u4 = obj.YCtrl();                % -> U4 = Mz
+                obj.R = obj.RCtrl();                % -> R
+                obj.P = obj.PCtrl();                % -> P
+                obj.Y = obj.YCtrl();                % -> Y
+
+                obj.u1 = obj.T + obj.R + obj.P + obj.Y;
+                obj.u2 = obj.T - obj.R - obj.P + obj.Y;
+                obj.u3 = obj.T - obj.R + obj.P - obj.Y;
+                obj.u4 = obj.T + obj.R - obj.P - obj.Y;
             end
             
             obj.u = [obj.u1; obj.u2; obj.u3; obj.u4];
