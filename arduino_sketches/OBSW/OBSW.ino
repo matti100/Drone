@@ -1,19 +1,15 @@
 #include "MPU6050.h"
 #include "BLDC.h"
-#include "TMTC.h"
 
 MPU6050 IMU;
 BLDC Motors;
-TMTC esp32;
-
-//Servo esc;
 
 void setup() {
   Serial.begin(9600);
 
   int sensitivity = 1;        // +/- 4g     +/- 500 deg/s
   int clock = 400000;         // [Hz]
-  int initialSignal = 0;      // PWM
+  int initialSignal = 1000;   // PWM min
 
   Serial.print("\n\n----------------\n");
   Serial.print("IMU INITIALIZATION");
@@ -31,11 +27,12 @@ void setup() {
   Serial.print("\n\n----------------\n");
   Serial.print("DATA ACQUISITION");
   Serial.print("\n----------------\n");
+
 }
 
 String inputString = "";
 bool stringComplete = false;
-int vel = 0;
+int vel = 1000;
 
 
 void loop() {
@@ -50,7 +47,7 @@ void loop() {
     inputString = "";
     stringComplete = false;
 
-    vel = 255/100 * vel;
+    // vel = ceil((255.0/100.0) * vel);
   }
 
   Motors.setVelocity(vel, vel, vel, vel);

@@ -1,3 +1,5 @@
+/*
+
 #include "Arduino.h"
 #include "TMTC.h"
 #include <WiFi.h>
@@ -110,6 +112,7 @@ void TMTC::receiveData() {
 }
 */ 
 
+/*
 void TMTC::receiveData() {
   // Extract JSON string
   String jsonData = server.arg("plain"); // text plain data type (JSON string)
@@ -132,4 +135,6 @@ void TMTC::handleClient() {
 }
 
 // -------------- BLUETOOTH --------------
+
+*/
 

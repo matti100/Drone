@@ -1,5 +1,6 @@
 #include "BLDC.h"
 #include "Arduino.h"
+#include "Servo.h"
 
 // -------------- CONSTRUCTOR --------------
 BLDC::BLDC(){
@@ -7,9 +8,12 @@ BLDC::BLDC(){
 
 // -------------- INITIALIZATION --------------
 void BLDC::init(int initialSignal) {
+  esc1.attach(MOTOR_PIN_1, minPWM, maxPWM);
+  esc2.attach(MOTOR_PIN_2, minPWM, maxPWM);
+  esc3.attach(MOTOR_PIN_3, minPWM, maxPWM);
+  esc4.attach(MOTOR_PIN_4, minPWM, maxPWM);
 
   setVelocity(initialSignal, initialSignal, initialSignal, initialSignal);
-
 };
 
 // -------------- UPDATE COMMANDS --------------
@@ -23,14 +27,14 @@ void BLDC::updateCMD(int pwmSignal1, int pwmSignal2, int pwmSignal3, int pwmSign
 
   // Conversion from [pwm] to [rpm]
   //    -> RPM = motorPower [KV] * batteryVoltage [V] * batteryLevel [0, 1] * DutyCycle [%]
-  //    DutyCycle [%] = (100 / 255) * pwmSignal;
+  //    DutyCycle [%] = (minPWM / maxPWM) * pwmSignal;      minPWM = 1000 microseconds, maxPWM = 2000 microseconds
   
   float voltage = 11.1;        // !! to do: batteryLevel, batteryVoltage !! 
 
-  w1 = MOTOR_POWER * voltage * (signal1 / 255) * 100;
-  w2 = MOTOR_POWER * voltage * (signal2 / 255) * 100;
-  w3 = MOTOR_POWER * voltage * (signal3 / 255) * 100;
-  w4 = MOTOR_POWER * voltage * (signal4 / 255) * 100;
+  w1 = MOTOR_POWER * maxVoltage * (signal1 / maxPWM) * minPWM;
+  w2 = MOTOR_POWER * maxVoltage * (signal2 / maxPWM) * minPWM;
+  w3 = MOTOR_POWER * maxVoltage * (signal3 / maxPWM) * minPWM;
+  w4 = MOTOR_POWER * maxVoltage * (signal4 / maxPWM) * minPWM;
 
 };
 
@@ -40,9 +44,8 @@ void BLDC::setVelocity(int pwmSignal1, int pwmSignal2, int pwmSignal3, int pwmSi
 
   updateCMD(pwmSignal1, pwmSignal2, pwmSignal3, pwmSignal4);
 
-  analogWrite(MOTOR1_PIN, signal1);
-  analogWrite(MOTOR2_PIN, signal2);
-  analogWrite(MOTOR3_PIN, signal3);
-  analogWrite(MOTOR4_PIN, signal4);
-
+  esc1.writeMicroseconds(signal1);
+  esc2.writeMicroseconds(signal2);
+  esc3.writeMicroseconds(signal3);
+  esc4.writeMicroseconds(signal4);
 };
