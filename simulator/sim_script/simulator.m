@@ -60,10 +60,10 @@ tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
 % Linearize around hovering flag
-linear = 0;            % 0 -> no linearization (PID + non-linear dynamics)
-                       % 1 -> linearization (LQR + linear dynamics)
+linear = 0;            % 0 -> PID + non-linear dynamics
+                       % 1 -> LQR + linear dynamics
                        % 2 -> LQR + non-linear dynamics
-                       % -1 -> (PID + linear dynamics)
+                       % -1 -> PID + linear dynamics
 
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
@@ -102,7 +102,7 @@ if (tuner_flag == 1)
 
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
 
-    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
+    Drone = Drone(params, x0, desideredState, gains, tspan, linear);
 
     tunedGains = PID_tuner(Drone, k0, maxIter, tol, alpha);
 
@@ -121,7 +121,7 @@ elseif (tuner_flag == 2)
 
     k0 = zeros(6,3);
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
-    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
+    Drone = Drone(params, x0, desideredState, gains, tspan, linear);
 
     tunedGains = ga_tuner(Drone, pop_size, maxGen, mutation_rate, kMax, tol);
 
