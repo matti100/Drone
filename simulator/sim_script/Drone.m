@@ -526,8 +526,8 @@ classdef Drone < handle
             obj.Derr_z = obj.bkwFD(obj.err_z, obj.err_z_prev);
             
             % PID controller
-            T = sqrt((obj.m*obj.g)/(4*obj.k_f)); % minimum required to balance weight
-            T = T + (obj.kP_T * obj.err_z + ...
+            % T = sqrt((obj.m*obj.g)/(4*obj.k_f)); % minimum required to balance weight
+            T = (obj.kP_T * obj.err_z + ...
                      obj.kI_T * obj.Serr_z + ...
                      obj.kD_T * obj.Derr_z);
         end

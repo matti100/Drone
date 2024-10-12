@@ -43,18 +43,19 @@ params.dt = 0.01;       % [s]                % Time interval
 
 % Initial Condition
 x0 = zeros(12,1);
-x0(3) = 2.1;
+x0(3) = 0;
 x0(7) = 0.4;
 x0(8) = 0.6;
+x0(9) = -0.2;
 
 % Desidered Position
 desideredState = struct();
-desideredState.rDes = [0, 0, 2]';      % [m]
+desideredState.rDes = [1, -0.5, 2]';      % [m]
 desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
-tmax = 10;              % [s]
+tmax = 20;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
@@ -130,33 +131,31 @@ else
     disp('-----------------------------------');
     disp('------------ Simulation -----------');
     disp('-----------------------------------');
+
+    % Manual tuning                         % I set                 II set
+    kP = [20;        % -> kP_T                 20                     20
+          0;        % -> kP_phi                0
+          0;        % -> kP_theta              0
+          1.55;        % -> kP_R 50            1                      1.55
+          1.55;        % -> kP_P               1                      1.55
+          0.1];       % -> kP_Y                0.1                  x 0.02
+
+    kI = [10;        % -> kI_T                 10                     10
+          0;        % -> kI_phi                0
+          0;        % -> kI_theta              0
+          0.17;        % -> kI_R 10            0.13                   0.17
+          0.17;        % -> KI_P               0.13                   0.17
+          0.013];        % -> KI_Y             0.013                x 0.01
+
+    kD = [10;        % -> kD_T                 10                     10
+          0;        % -> kD_phi                0
+          0;        % -> kD_theta              0
+          0.76;        % -> kD_R 35            0.66                   0.76
+          0.76;        % -> kD_P               0.66                   0.76
+          0.066];       % -> kD_Y              0.066                x 0.01
     
-    % Manual tuning
-    kP = [150;        % -> kP_T
-          -3.3;        % -> kP_phi
-          0;        % -> kP_theta
-          15;        % -> kP_R 50
-          -15;        % -> kP_P
-          0];       % -> kP_Y
-
-    kI = [20;        % -> kI_T        
-          -7.7;        % -> kI_phi
-          0;        % -> kI_theta
-          20;        % -> kI_R 10
-          -6;        % -> KI_P
-          0];       % -> KI_Y
-
-    kD = [100;        % -> kD_T
-          -0.85;        % -> kD_phi
-          0;        % -> kD_theta
-          80;        % -> kD_R 35
-          -5;        % -> kD_P
-          0];       % -> kD_Y
-
-    gains = gainBuilder(kP, kI, kD);
-    
-    load('tunedGains_ga.mat');
     % gains = tunedGains;
+    gains = gainBuilder(kP, kI, kD);
 
     % Initialize Drone
     Drone = Drone(params, x0, desideredState, gains, tspan, linear);
