@@ -70,7 +70,7 @@ plot_flag = 1;               % 1 -> plot                0 -> no plot
 anim_flag = 0;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
-tuner_flag = 2;         % 1 -> Gradient Descent optimization
+tuner_flag = 0;         % 1 -> Gradient Descent optimization
                         % 2 -> Genetic Algorithm
                         % 0 -> no tuning
 
@@ -102,7 +102,7 @@ if (tuner_flag == 1)
 
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
 
-    Drone = Drone(params, x0, desideredState, gains, tspan, linear);
+    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
 
     tunedGains = PID_tuner(Drone, k0, maxIter, tol, alpha);
 
@@ -115,15 +115,15 @@ elseif (tuner_flag == 2)
     
     pop_size = 100;
     maxGen = 2000;
-    tol = 1e-2;
-    mutation_rate = 0.3;
+    tol = 0.5;
+    mutation_rate = 0.6;
     kMax = 1;
 
     k0 = zeros(6,3);
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
-    Drone = Drone(params, x0, desideredState, gains, tspan, linear);
+    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
 
-    tunedGains = ga_tuner(Drone, pop_size, maxGen, mutation_rate, kMax, tol);
+    tunedGains = ga_tuner2(Drone, pop_size, maxGen, mutation_rate, kMax, tol);
 
     save('tunedGains_ga', "tunedGains");
 
@@ -154,6 +154,7 @@ else
           0.76;        % -> kD_P               0.66                   0.76
           0.066];       % -> kD_Y              0.066                x 0.01
     
+    % load("tunedGains_ga.mat");
     % gains = tunedGains;
     gains = gainBuilder(kP, kI, kD);
 

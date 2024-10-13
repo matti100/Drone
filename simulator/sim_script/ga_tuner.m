@@ -55,7 +55,7 @@ tunedGains = gainBuilder(kP, kI, kD);
 end
 
 %% -------- FUNCTIONS ----------
-% Fitness function computation: MSE
+% Fitness function computation
 function fitness = compute_fitness(individuo, Drone)
 Kp = individuo(:, 1:3:end-2);
 Ki = individuo(:, 2:3:end-1);
@@ -90,7 +90,7 @@ MSE = mean(error);
 % Fitness function computation
 % fitness = MSE + V_dot;
 fitness = MSE;
-
+% fitness = ISE;
 end
 
 % Select random parent from population

@@ -7,7 +7,7 @@ classdef Drone < handle
         m               % [Kg]              % Mass
 
         Ix              % [Kg / m^2]         % Principal Moment of Inertia X
-        Iy              % [Kg / m^2]         % Principal Moment of Inertia x
+        Iy              % [Kg / m^2]         % Principal Moment of Inertia Y
         Iz              % [Kg / m^2]         % Principal Moment of Inertia Z
         I               % [3x3] [kg / m^2]   % Principal Inertia Matrix
 
@@ -329,15 +329,15 @@ classdef Drone < handle
             %              x(4);
             %              x(5);
             %              x(6);
-            %              (k_f/m)*(sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2);
-            %              (k_f/m)*(-cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2);
-            %              (k_f/m)*(cos(x(8))*cos(x(7)))*(u(1)^2 + u(2)^2 + u(3)^2 + u(4)^2) - g;
+            %              (k_f/m)*(sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)))*u1;
+            %              (k_f/m)*(-cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)))*u1);
+            %              (k_f/m)*(cos(x(8))*cos(x(7)))*u1 - g;
             %              x(10);
             %              x(11);
             %              x(12);
-            %              (L*k_f/a)*(u(4)^2 - u(3)^2) + ((b-c)/a)*x(11)*x(12);
-            %              (L*k_f/b)*(u(2)^2 - u(1)^2) + ((c-a)/b)*x(10)*x(12);
-            %              (k_m/c)*(u(1)^2 + u(2)^2 - u(3)^2 - u(4)^2) + ((a-b)/c)*x(10)*x(11);
+            %              u2/a + ((b-c)/a)*x(11)*x(12);
+            %              u3/b + ((c-a)/b)*x(10)*x(12);
+            %              u4/c + ((a-b)/c)*x(10)*x(11);
             %              ];
             
             if (abs(obj.linear) == 1)
@@ -451,13 +451,10 @@ classdef Drone < handle
 
             % Compute B-matrix
             obj.B = zeros(12, 4);
-            obj.B(6, :) = sqrt((obj.k_f*obj.g)/obj.m);
-            obj.B(10, 3) = -(2*obj.l*obj.k_f/obj.Ix)*sqrt((obj.m*obj.g)/(4*obj.k_f));
-            obj.B(10, 4) = (2*obj.l*obj.k_f/obj.Ix)*sqrt((obj.m*obj.g)/(4*obj.k_f));
-            obj.B(11, 1) = -(2*obj.l*obj.k_f/obj.Iy)*sqrt((obj.m*obj.g)/(4*obj.k_f));
-            obj.B(11, 2) = (2*obj.l*obj.k_f/obj.Iy)*sqrt((obj.m*obj.g)/(4*obj.k_f));
-            obj.B(12, 1:2) = (2*obj.k_m/obj.Iz)*sqrt((obj.m*obj.g)/(4*obj.k_f));
-            obj.B(12, 3:4) = -(2*obj.k_m/obj.Iz)*sqrt((obj.m*obj.g)/(4*obj.k_f));
+            obj.B(6, 1) = 1/obj.m;
+            obj.B(10, 2) = 1/obj.Ix;
+            obj.B(11, 3) = 1/obj.Iy;
+            obj.B(12, 4) = 1/obj.Iz;
 
             % LQR controller
             % Verifying modes stability
