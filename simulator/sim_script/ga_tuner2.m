@@ -116,24 +116,23 @@ end
 % Mean Square Error computation (MSE)
 err_x = Drone.err_x(~isnan(Drone.err_x) & ~isinf(Drone.err_x));
 err_y = Drone.err_y(~isnan(Drone.err_y) & ~isinf(Drone.err_y));
-err_z = Drone.err_z(~isnan(Drone.err_z) & ~isinf(Drone.err_z));
-err_phi = Drone.err_phi(~isnan(Drone.err_phi) & ~isinf(Drone.err_phi));
-err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
-err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
 
-error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
+error = [err_x; err_y];
 error = error.^2;
 MSE = mean(error);
 
-% % Lyapunov Function derivative
-% dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
-% 
-% V_dot = max(dV, zeros(size(dV)));
-% V_dot = sum(V_dot);
+% Lyapunov Function derivative
+dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
+
+V_dot = max(dV, zeros(size(dV)));
+V_dot = sum(V_dot);
+
+% Integral of the Square error (Trapezium integration method)
+% ISE = 0.5*Drone.dt*( error(1) + error(end) ) + Drone.dt*sum(error(2:end-1));
 
 % Fitness function computation
-% fitness = MSE + V_dot;
-fitness = MSE;
+fitness = MSE + V_dot;
+
 end
 
 % Select random parent from population

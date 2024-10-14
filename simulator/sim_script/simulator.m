@@ -70,7 +70,7 @@ plot_flag = 1;               % 1 -> plot                0 -> no plot
 anim_flag = 0;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
-tuner_flag = 0;         % 1 -> Gradient Descent optimization
+tuner_flag = 2;         % 1 -> Gradient Descent optimization
                         % 2 -> Genetic Algorithm
                         % 0 -> no tuning
 
