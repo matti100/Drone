@@ -291,6 +291,15 @@ classdef Drone < handle
             obj.kD_Y = gains.kD_Y;   
         end
 
+        function updateDesiredState(obj, x, y, z, psi) 
+            obj.rDes(1) = x;
+            obj.rDes(2) = y;
+            obj.rDes(3) = z;
+            obj.attDes(3) = psi;
+
+            obj.xDes = [obj.rDes; 0; 0; 0; obj.attDes; 0; 0; 0];
+        end
+
         %% Get State 
         function state = getState(obj)
             state = obj.x;
@@ -364,8 +373,10 @@ classdef Drone < handle
                 obj.u4 = obj.u_lin(4);
             else
                 obj.u1 = obj.altitudeCtrl();         % -> T
-                obj.attDes(1) = obj.phiCtrl();      % -> phi_des
-                obj.attDes(2) = obj.thetaCtrl();    % -> theta_des
+                obj.attDes(1) = obj.phiCtrl();       % -> phi_des
+                obj.xDes(7) = obj.attDes(1);
+                obj.attDes(2) = obj.thetaCtrl();     % -> theta_des
+                obj.xDes(8) = obj.attDes(2);
                 obj.u2 = obj.RCtrl();                % -> U2 = Mx
                 obj.u3 = obj.PCtrl();                % -> U3 = My
                 obj.u4 = obj.YCtrl();                % -> U4 = Mz
@@ -483,15 +494,17 @@ classdef Drone < handle
                 % LQR control design
                 % State variables weigths;
                 d = zeros(12, 1);
-                d(1:3) = 100;        % x, y, z
-                d(4:6) = 100;        % x_dot, y_dot, z_dot
-                d(7:9) = 100;        % phi, theta, psi
-                d(10:end) = 100;     % phi_dot, theta_dot, psi_dot
+                d(1:3) = 10;        % x, y, z
+                d(3) = 1e3;
+                d(4:6) = 1;        % x_dot, y_dot, z_dot
+                d(7:9) = 10;        % phi, theta, psi
+                d(10:end) = 1;     % phi_dot, theta_dot, psi_dot
                 % Q matrix computation
                 Q_mat = diag(d);
 
                 % Input variables weights
-                d = 100.*ones(4,1);
+                d = 1.*ones(4,1);
+                d(1) = 0.01;
                 % R matrix computation
                 R_mat = diag(d);
 
@@ -582,6 +595,7 @@ classdef Drone < handle
         end
 
         % Roll controller - phi_error based
+        % Control Y position
         function R = RCtrl(obj) % U2
             % Error computation
             if (length(obj.t) > 1)      % err_phi_prevprev available
@@ -607,34 +621,36 @@ classdef Drone < handle
                 obj.kD_R * obj.Derr_phi;
         end
 
-        % % Roll controller - x_error based 
+        % % Roll controller - y_error based 
+        % % Control Y position
         % function R = RCtrl(obj)
         %     % Error computation
-        %     if (length(obj.t) > 1)      % err_x_prevprev available  
+        %     if (length(obj.t) > 1)      % err_y_prevprev available  
         %         % Error computation
-        %         obj.err_x_prevprev = obj.err_x_prev;
-        %         obj.err_x_prev = obj.err_x;
-        %         obj.err_x = obj.rDes(1) - obj.x(1); % x_des - x
+        %         obj.err_y_prevprev = obj.err_y_prev;
+        %         obj.err_y_prev = obj.err_y;
+        %         obj.err_y = obj.rDes(2) - obj.x(2); % y_des - y
         % 
-        %         obj.Serr_x = obj.Serr_x + ...
-        %                        obj.simpson(obj.err_x, obj.err_x_prev, obj.err_x_prevprev);
+        %         obj.Serr_y = obj.Serr_y + ...
+        %                        obj.simpson(obj.err_y, obj.err_y_prev, obj.err_y_prevprev);
         %     else
-        %         obj.err_x_prev = obj.err_x;
-        %         obj.err_x = obj.rDes(1) - obj.x(1); 
+        %         obj.err_y_prev = obj.err_y;
+        %         obj.err_y = obj.rDes(2) - obj.x(2); 
         % 
-        %         obj.Serr_x = obj.Serr_x + ...
-        %                      obj.trap(obj.err_x, obj.err_x_prev);
+        %         obj.Serr_y = obj.Serr_y + ...
+        %                      obj.trap(obj.err_y, obj.err_y_prev);
         %     end
         % 
-        %     obj.Derr_x = obj.bkwFD(obj.err_x, obj.err_x_prev);
+        %     obj.Derr_y = obj.bkwFD(obj.err_y, obj.err_y_prev);
         % 
         %     % PID controller
-        %     R = obj.kP_R * obj.err_x + ...
-        %         obj.kI_R * obj.Serr_x + ...
-        %         obj.kD_R * obj.Derr_x;
+        %     R = obj.kP_R * obj.err_y + ...
+        %         obj.kI_R * obj.Serr_y + ...
+        %         obj.kD_R * obj.Derr_y;
         % end
 
         % Pitch controller - theta_error based
+        % Control X position
         function P = PCtrl(obj)
             % Error computation
             if (length(obj.t) > 1)      % err_theta_prevprev available
@@ -660,30 +676,31 @@ classdef Drone < handle
                 obj.kD_P * obj.Derr_theta;
         end
 
-        % % Pitch controller - y_error based
+        % % Pitch controller - x_error based
+        % % Control X position
         % function P = PCtrl(obj)
         %     % Error computation
         %     if (length(obj.t) > 1)       % err_y_prevprev available
-        %         obj.err_y_prevprev = obj.err_y_prev;
-        %         obj.err_y_prev = obj.err_y;
-        %         obj.err_y = obj.rDes(2) - obj.x(2); % y_des - y
+        %         obj.err_x_prevprev = obj.err_x_prev;
+        %         obj.err_x_prev = obj.err_x;
+        %         obj.err_x = obj.rDes(1) - obj.x(1); % x_des - x
         % 
-        %         obj.Serr_y = obj.Serr_y + ...
-        %                        obj.simpson(obj.err_y, obj.err_y_prev, obj.err_y_prevprev);
+        %         obj.Serr_x = obj.Serr_x + ...
+        %                        obj.simpson(obj.err_x, obj.err_x_prev, obj.err_x_prevprev);
         %     else
-        %         obj.err_y_prev = obj.err_y;
-        %         obj.err_y = obj.rDes(2) - obj.x(2); % y_des - y
+        %         obj.err_x_prev = obj.err_x;
+        %         obj.err_x = obj.rDes(2) - obj.x(2); % x_des - x
         % 
-        %         obj.Serr_y = obj.Serr_y + ...
-        %                        obj.trap(obj.err_y, obj.err_y_prev);
+        %         obj.Serr_x = obj.Serr_x + ...
+        %                        obj.trap(obj.err_x, obj.err_x_prev);
         %     end
         % 
-        %     obj.Derr_y = obj.bkwFD(obj.err_y, obj.err_y_prev);
+        %     obj.Derr_x = obj.bkwFD(obj.err_x, obj.err_x_prev);
         % 
         %     % PID controller
-        %     P = obj.kP_P * obj.err_y + ...
-        %         obj.kI_P * obj.Serr_y + ...
-        %         obj.kD_P * obj.Derr_y;
+        %     P = obj.kP_P * obj.err_x + ...
+        %         obj.kI_P * obj.Serr_x + ...
+        %         obj.kD_P * obj.Derr_x;
         % end
 
         % Yaw controller

@@ -43,24 +43,26 @@ params.dt = 0.01;       % [s]                % Time interval
 
 % Initial Condition
 x0 = zeros(12,1);
-x0(3) = 0;
-x0(7) = 0.4;
-x0(8) = 0.6;
-x0(9) = -0.2;
+x0(1) = 0;
+x0(2) = 0;
+x0(3) = 1;
+x0(7) = 0;
+x0(8) = 0;
+x0(9) = 0;
 
 % Desidered Position
 desideredState = struct();
 desideredState.rDes = [1, -0.5, 2]';      % [m]
-desideredState.attDes = [0, 0, 0]';
+desideredState.attDes = [0, 0, pi/2]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
-tmax = 20;              % [s]
+tmax = 100;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
 % Linearize around hovering flag
-linear = 0;            % 0 -> PID + non-linear dynamics
+linear = 2;            % 0 -> PID + non-linear dynamics
                        % 1 -> LQR + linear dynamics
                        % 2 -> LQR + non-linear dynamics
                        % -1 -> PID + linear dynamics
@@ -70,7 +72,7 @@ plot_flag = 1;               % 1 -> plot                0 -> no plot
 anim_flag = 0;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
-tuner_flag = 2;         % 1 -> Gradient Descent optimization
+tuner_flag = 0;         % 1 -> Gradient Descent optimization
                         % 2 -> Genetic Algorithm
                         % 0 -> no tuning
 
@@ -92,13 +94,6 @@ if (tuner_flag == 1)
     alpha = 1e-5;
 
     k0 = rand(6,3); %[kP, kI, kD]
-
-    % k0(1, :) = k0(1, :) .* 1e2;
-    % k0(2, :) = k0(2, :) .* 1e-2;
-    % k0(3, :) = k0(3, :) .* 1e-3;
-    % k0(4, :) = k0(4, :) .* 1e-2;
-    % k0(5, :) = k0(5, :) .* 1e-4;
-    % k0(6, :) = k0(5, :) .* 1e-4;
 
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
 
@@ -133,25 +128,25 @@ else
     disp('-----------------------------------');
 
     % Manual tuning                         % I set                 II set
-    kP = [20;        % -> kP_T                 20                     20
-          0;        % -> kP_phi                0
-          0;        % -> kP_theta              0
-          1.55;        % -> kP_R 50            1                      1.55
-          1.55;        % -> kP_P               1                      1.55
-          0.1];       % -> kP_Y                0.1                  x 0.02
+    kP = [20;        % -> kP_T                  20                     20
+          5;        % -> kP_phi                0
+          5;        % -> kP_theta              0
+          1;        % -> kP_R                   1                      1.55
+          1;        % -> kP_P                   1                      1.55
+          0.1];       % -> kP_Y                   0.1                  x 0.02
 
     kI = [10;        % -> kI_T                 10                     10
-          0;        % -> kI_phi                0
-          0;        % -> kI_theta              0
-          0.17;        % -> kI_R 10            0.13                   0.17
-          0.17;        % -> KI_P               0.13                   0.17
+          1;        % -> kI_phi                0
+          1;        % -> kI_theta              0
+          0.13;        % -> kI_R            0.13                   0.17
+          0.13;        % -> KI_P               0.13                   0.17
           0.013];        % -> KI_Y             0.013                x 0.01
 
     kD = [10;        % -> kD_T                 10                     10
-          0;        % -> kD_phi                0
-          0;        % -> kD_theta              0
-          0.76;        % -> kD_R 35            0.66                   0.76
-          0.76;        % -> kD_P               0.66                   0.76
+          1;        % -> kD_phi                0
+          1;        % -> kD_theta              0
+          0.66;        % -> kD_R            0.66                   0.76
+          0.66;        % -> kD_P               0.66                   0.76
           0.066];       % -> kD_Y              0.066                x 0.01
     
     % load("tunedGains_ga.mat");
@@ -162,7 +157,17 @@ else
     Drone = Drone(params, x0, desideredState, gains, tspan, linear);
 
     % Simulation
+    t = 0;
     for i = 1:length(tvec)-1
+        % if (Drone.r(1) - desideredState.rDes(1) < 0.05)
+        %     t = t + 0.001;
+        %     desideredState.rDes(1) = desideredState.rDes(1) + 0.05*rand();
+        % end
+        % y = desideredState.rDes(2);
+        % z = desideredState.rDes(3);
+        % psi = desideredState.attDes(3);
+        % Drone.updateDesiredState(desideredState.rDes(1), y, z, psi);
+
         Drone.updateState();
         Drone.logger();
     end
@@ -201,7 +206,7 @@ if (plot_flag)
     ylabel('attitude [rad]');
     legend('phi', 'theta', 'psi');
     title('Attitude of the drone');
-    ylim([-0.3, 0.3]);
+    % ylim([-0.3, 0.3]);
 
     if (anim_flag)
 
