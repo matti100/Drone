@@ -1,7 +1,7 @@
 clear
 clc
 close all
-
+w = warning ('off','all');
 %% new branch
 
 %% Problem initialization
@@ -45,7 +45,7 @@ params.dt = 0.01;       % [s]                % Time interval
 x0 = zeros(12,1);
 x0(1) = 0;
 x0(2) = 0;
-x0(3) = 1;
+x0(3) = 0;
 x0(7) = 0;
 x0(8) = 0;
 x0(9) = 0;
@@ -57,15 +57,19 @@ desideredState.attDes = [0, 0, pi/2]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
-tmax = 100;              % [s]
+tmax = 10;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
 % Linearize around hovering flag
-linear = 2;            % 0 -> PID + non-linear dynamics
+linear = 0;            % 0 -> PID + non-linear dynamics
                        % 1 -> LQR + linear dynamics
                        % 2 -> LQR + non-linear dynamics
                        % -1 -> PID + linear dynamics
+
+% MPC (Model Predictive Control)
+mpc = 1;               % 1 -> yes
+                       % 0 -> no
 
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
@@ -154,7 +158,7 @@ else
     gains = gainBuilder(kP, kI, kD);
 
     % Initialize Drone
-    Drone = Drone(params, x0, desideredState, gains, tspan, linear);
+    Drone = Drone2(params, x0, desideredState, gains, tspan, linear);
 
     % Simulation
     t = 0;
