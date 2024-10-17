@@ -32,6 +32,7 @@ void setup() {
 
 String inputString = "";
 bool stringComplete = false;
+int input = 0;
 int vel = 1000;
 
 
@@ -41,13 +42,14 @@ void loop() {
 
   if (stringComplete) {
     // Convert the inpunt string in a number
-    vel = inputString.toInt();
+    input = inputString.toInt();
 
     // Input string and flag reset
     inputString = "";
     stringComplete = false;
 
     // vel = ceil((255.0/100.0) * vel);
+    vel = 1000 + 10*input;
   }
 
   Motors.setVelocity(vel, vel, vel, vel);
@@ -55,9 +57,11 @@ void loop() {
   IMU.computeLiftTorqueCoefficients(vel);
   Serial.print("zAccel:");
   Serial.print(IMU.zAccel);
+  Serial.print("\tLift:");
+  Serial.print(IMU.lift);
   Serial.print("\tInput command:");
-  Serial.print(vel);
-  Serial.print("\tLift Coefficients:");
+  Serial.print(input);
+  Serial.print(" \tLift Coefficients:");
   Serial.println(IMU.kF);
   delay(100);
 }

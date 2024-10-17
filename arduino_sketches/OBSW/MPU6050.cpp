@@ -231,15 +231,15 @@ void MPU6050::computeLiftTorqueCoefficients(float vel) {
   
   // Compute Lift
   // Lift = (zAccel * mass) - Weight
-  float mass = 0.190;         // mass of the experimental system [g]
+  float mass = 1;             // mass of the experimental system [kg]
   float g = 9.81;
-  float lift = (zAccel * mass) - (g * mass);
+  lift = zAccel - g;    // specific lift (lift over mass) [N / kg]
 
   // Compute Torque
 
   // Compute coefficients
-  kF = lift / (RPM * RPM); 
-
+  float SCALE_FACTOR = 1e12;
+  kF = SCALE_FACTOR * mass * lift / (4*(RPM * RPM)); 
 }
 
 

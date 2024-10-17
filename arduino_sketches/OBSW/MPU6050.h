@@ -49,6 +49,7 @@ public:
   float pitchRate;
   float yawRate;
 
+  float lift;
   float kF;
   float kM;
 
