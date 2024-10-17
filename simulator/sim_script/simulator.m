@@ -1,7 +1,7 @@
 clear
 clc
 close all
-w = warning ('off','all');
+w = warning ('on','all');
 %% new branch
 
 %% Problem initialization
@@ -45,7 +45,7 @@ params.dt = 0.01;       % [s]                % Time interval
 x0 = zeros(12,1);
 x0(1) = 0;
 x0(2) = 0;
-x0(3) = 0;
+x0(3) = 1;
 x0(7) = 0;
 x0(8) = 0;
 x0(9) = 0;
@@ -61,15 +61,12 @@ tmax = 10;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
-% Linearize around hovering flag
-linear = 0;            % 0 -> PID + non-linear dynamics
+% Control mode
+control = 3;           % 0 -> PID + non-linear dynamics
                        % 1 -> LQR + linear dynamics
                        % 2 -> LQR + non-linear dynamics
                        % -1 -> PID + linear dynamics
-
-% MPC (Model Predictive Control)
-mpc = 1;               % 1 -> yes
-                       % 0 -> no
+                       % 3 -> mpc
 
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
@@ -158,19 +155,15 @@ else
     gains = gainBuilder(kP, kI, kD);
 
     % Initialize Drone
-    Drone = Drone2(params, x0, desideredState, gains, tspan, linear);
+    Drone = Drone2(params, x0, desideredState, gains, tspan, control);
+    Drone.linearizeHovering();
 
     % Simulation
     t = 0;
     for i = 1:length(tvec)-1
-        % if (Drone.r(1) - desideredState.rDes(1) < 0.05)
-        %     t = t + 0.001;
-        %     desideredState.rDes(1) = desideredState.rDes(1) + 0.05*rand();
-        % end
-        % y = desideredState.rDes(2);
-        % z = desideredState.rDes(3);
-        % psi = desideredState.attDes(3);
-        % Drone.updateDesiredState(desideredState.rDes(1), y, z, psi);
+        if ( abs(Drone.r - desideredState.rDes) < 0.5*ones(3,1) )
+            Drone.control = 2;
+        end
 
         Drone.updateState();
         Drone.logger();

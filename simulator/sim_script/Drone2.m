@@ -62,6 +62,7 @@ classdef Drone2 < handle
         xDes
 
         % Errors
+        error;
         err_x; err_x_prev; err_x_prevprev; Serr_x; Derr_x;
         err_y; err_y_prev; err_y_prevprev; Serr_y; Derr_y;
         err_z; err_z_prev; err_z_prevprev; Serr_z; Derr_z;
@@ -133,9 +134,10 @@ classdef Drone2 < handle
 
         traj            % [tx12]         Time evolution of the state
 
-        %% Linearization
-        linear;         % flag
+        %% Control
+        control         % flag
 
+        %% Linearization
         A; 
         B;
         C;
@@ -153,7 +155,7 @@ classdef Drone2 < handle
     methods
 
         %% Constructor
-        function obj = Drone2(params, initialCondition, desideredState, gains, tspan, linear)
+        function obj = Drone2(params, initialCondition, desideredState, gains, tspan, control)
             
             % Params
             obj.m = params.m;
@@ -195,12 +197,14 @@ classdef Drone2 < handle
             obj.xDes = [obj.rDes; 0; 0; 0; obj.attDes; 0; 0; 0];
            
             % Errors
-            obj.err_x = obj.rDes(1) - obj.x(1);
-            obj.err_y = obj.rDes(2) - obj.x(2);
-            obj.err_z = obj.rDes(3) - obj.x(3);
-            obj.err_phi = obj.attDes(1) - obj.x(7);
-            obj.err_theta = obj.attDes(2) - obj.x(8);
-            obj.err_psi = obj.attDes(3) - obj.x(9);
+            obj.error = obj.xDes - obj.x;
+
+            obj.err_x = obj.error(1);
+            obj.err_y = obj.error(2);
+            obj.err_z = obj.error(3);
+            obj.err_phi = obj.error(7);
+            obj.err_theta = obj.error(8);
+            obj.err_psi = obj.error(9);
 
             obj.err_x_prev = 0; obj.err_x_prevprev = 0; obj.Serr_x = 0; obj.Derr_x = 0;
             obj.err_y_prev = 0; obj.err_y_prevprev = 0; obj.Serr_y = 0; obj.Derr_y = 0;
@@ -249,9 +253,11 @@ classdef Drone2 < handle
 
             obj.traj = obj.x0';
 
+            % Control
+            obj.control = control;
+
             % Linearization
-            obj.linear = linear;
-            if (obj.linear ~= 0)
+            if (obj.control ~= 0 && obj.control ~= 3)
                 obj.linearizeHovering();
             end
 
@@ -350,7 +356,7 @@ classdef Drone2 < handle
             %              u4/c + ((a-b)/c)*x(10)*x(11);
             %              ];
             
-            if (abs(obj.linear) == 1)
+            if (abs(obj.control) == 1)
                 obj.dx = obj.A*obj.x + obj.B*obj.u;
             else
                 obj.o_R_b = obj.evalRotationMatrix(obj.att);
@@ -365,15 +371,15 @@ classdef Drone2 < handle
         %% CMD computation
         function obj = motorCMD(obj)
 
-            if (true)
-                if (mod(length(obj.t), 1) == 0)
+            if (obj.control == 3) % MPC
+                if (mod(length(obj.t), 5) == 0)
                     obj.u = obj.MPC();
                     % obj.u(1) = obj.u(1) + obj.m*obj.g;
                 else
                     obj.u = obj.u;
                 end
             else
-                if (obj.linear > 0)
+                if (obj.control > 0)
                     % LQR
                     obj.u_lin = obj.K * (obj.xDes - obj.x);
                     obj.u1 = obj.u_lin(1);
@@ -446,6 +452,14 @@ classdef Drone2 < handle
             obj.dV = [obj.dV, dV];
             
             % Update Error
+            obj.error = obj.xDes - obj.x;
+            obj.err_x = obj.error(1);
+            obj.err_y = obj.error(2);
+            obj.err_z = obj.error(3);
+            obj.err_phi = obj.error(7);
+            obj.err_theta = obj.error(8);
+            obj.err_psi = obj.error(9);
+
             obj.Err_x = [obj.Err_x, obj.err_x];
             obj.Err_y = [obj.Err_y, obj.err_y];
             obj.Err_z = [obj.Err_z, obj.err_z];
@@ -531,8 +545,8 @@ classdef Drone2 < handle
         function u_mpc = MPC(obj)
 
             % Define parameters
-            dT = obj.dt;                % time interval
-            N = 200;                     % Prediction horizon
+            dT = 0.1;                % time interval
+            N = 25;                     % Prediction horizon
             % alpha = 0.001;
             % du = 0.01;
             % grad_iters = 100;
@@ -544,13 +558,15 @@ classdef Drone2 < handle
             x_des = obj.xDes;
 
             % Inputs limits
-            u_min = [0; -100; -100; -100];
-            u_max = [100; 100; 100; 100];
+            u_min = repmat([0; -100; -100; -100], N, 1);  % Repeat min limits N times
+            u_max = repmat([100; 100; 100; 100], N, 1);   % Repeat max limits N times
 
             % Weigthing matrix
-            Q = eye(12).*100;
-            Q(3,3) = 1e5;
-            R = eye(4).*100;
+            Q = eye(6)*10;
+            % Q(3,3) = Q(3,3);
+            Q(3,3) = 100;
+            Q(6,6) = 50;
+            R = eye(4)*5;
 
             % Dynamics
             f = @(x, u) [x(4);
@@ -569,8 +585,15 @@ classdef Drone2 < handle
 
 
             % Optimal u
+            options = optimoptions('fmincon', ...
+                'Algorithm', 'interior-point', ...                 % Algoritmo scelto
+                'MaxFunctionEvaluations', 50000, ...     % Limite massimo delle valutazioni
+                'MaxIterations', 1000, ...               % Limite massimo delle iterazioni
+                'Display', 'final', ...                   % Mostra il progresso
+                'UseParallel',false,...
+                'FiniteDifferenceType', 'central');  % Differenze finite più accurate
             [u_opt, fval] = fmincon(@(u) cost_function(x_0, u, x_des, Q, R, N, f, dT), ...
-                zeros(4*N, 1), [], [], [], [], u_min, u_max);
+                zeros(4*N, 1), [], [], [], [], u_min, u_max, [], options);
 
             u_mpc = u_opt(1:4);
 
@@ -581,7 +604,10 @@ classdef Drone2 < handle
                 for k = 1:N
                     u_k = u((k-1)*4+1:k*4); % Prendi l'input di controllo per il k-esimo passo
                     x = f(x, u_k) * dt + x; % Propaga lo stato con la dinamica non lineare
-                    J = J + (x - xref)' * Q * (x - xref) + u_k' * R * u_k; % Funzione di costo
+                    err_lin = x(1:3) - xref(1:3);
+                    err_ang = x(7:9) - xref(7:9);
+                    err = [err_lin; err_ang];
+                    J = J + err' * Q * err + u_k' * R * u_k; % Funzione di costo
                 end
             end
 
@@ -868,10 +894,10 @@ classdef Drone2 < handle
         function logger(obj)
             progress = 100 - (100 * (abs(obj.t(end) - obj.tf))/obj.tf);
             fprintf('Progress:\t %f [perc] |\t', progress);
-            fprintf('Thrust:\t %f [N] |\t', obj.Fz);
+            fprintf('Inputs:\t [%f, %f, %f, %f] |\t', obj.u);
             % fprintf('R: \t %f\t|\t', obj.R);
             % fprintf('phi_des: \t %f [deg]\t|\t', obj.attDes(1));
-            fprintf('Err (x, y, z):\t [%f, %f, %f] [m] |\t', obj.err_x, obj.err_y, obj.err_z);
+            fprintf('Err (x, y, z):\t [%f, %f, %f] [m] |\t', obj.error(1:3));
             fprintf('Attitude:\t [%f, %f, %f] |\t', obj.att);
             fprintf('Altitude:\t %f [m] |\t', obj.x(3));
 
