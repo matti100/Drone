@@ -70,7 +70,7 @@ control = 3;           % 0 -> PID + non-linear dynamics
 
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
-anim_flag = 0;               % 1 -> animation           0 -> no animation
+anim_flag = 1;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
 tuner_flag = 0;         % 1 -> Gradient Descent optimization
@@ -98,9 +98,9 @@ if (tuner_flag == 1)
 
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
 
-    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
+    myDrone = Drone(params, x0, desideredState, gains, tspan, -1);
 
-    tunedGains = PID_tuner(Drone, k0, maxIter, tol, alpha);
+    tunedGains = PID_tuner(myDrone, k0, maxIter, tol, alpha);
 
     save('tunedGains_gradient', "tunedGains");
 
@@ -117,9 +117,9 @@ elseif (tuner_flag == 2)
 
     k0 = zeros(6,3);
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
-    Drone = Drone(params, x0, desideredState, gains, tspan, -1);
+    myDrone = Drone(params, x0, desideredState, gains, tspan, -1);
 
-    tunedGains = ga_tuner2(Drone, pop_size, maxGen, mutation_rate, kMax, tol);
+    tunedGains = ga_tuner2(myDrone, pop_size, maxGen, mutation_rate, kMax, tol);
 
     save('tunedGains_ga', "tunedGains");
 
@@ -155,29 +155,30 @@ else
     gains = gainBuilder(kP, kI, kD);
 
     % Initialize Drone
-    Drone = Drone2(params, x0, desideredState, gains, tspan, control);
-    Drone.linearizeHovering();
+    myDrone = Drone2(params, x0, desideredState, gains, tspan, control);
+    myDrone.linearizeHovering();
 
     % Simulation
     t = 0;
     for i = 1:length(tvec)-1
-        if ( abs(Drone.r - desideredState.rDes) < 0.5*ones(3,1) )
-            Drone.control = 2;
+        if ( abs(myDrone.r - desideredState.rDes) < 0.8*ones(3,1) )
+            myDrone.control = 2;
         end
 
-        Drone.updateState();
-        Drone.logger();
+        myDrone.updateState();
+        myDrone.logger();
     end
 end
 
 %% Plot
 if (plot_flag)
-    traj = Drone.traj(:, 1:3);
-    vel = Drone.traj(:, 4:6);
-    ang = Drone.traj(:, 7:9);
-    w = Drone.traj(:, 10:12);
+    close all
+    traj = myDrone.traj(:, 1:3);
+    vel = myDrone.traj(:, 4:6);
+    ang = myDrone.traj(:, 7:9);
+    w = myDrone.traj(:, 10:12);
 
-    figure;
+    figure(1);
 
     subplot(2,2,1)
     plot(tvec, traj);
@@ -188,9 +189,9 @@ if (plot_flag)
     ylim([-10, 10])
     
     subplot(2,2,2)
-    plot(tvec, Drone.V);
+    plot(tvec, myDrone.V);
     hold on;
-    plot(tvec, Drone.dV);
+    plot(tvec, myDrone.dV);
     plot(tvec, zeros(size(tvec)), '-.r');
     xlabel('Time [s]');
     ylabel('Lyapunov function');
@@ -214,8 +215,7 @@ if (plot_flag)
 
     pause = 0.001; % [s]
 
-    close all
-    figure
+    figure(2);
     subplot(2,2,1)
     xlabel('X (m)');
     ylabel('Y (m)');
