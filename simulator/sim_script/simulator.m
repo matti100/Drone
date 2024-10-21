@@ -52,8 +52,8 @@ x0(9) = 0;
 
 % Desidered Position
 desideredState = struct();
-desideredState.rDes = [1, 0, 2]';      % [m]
-desideredState.attDes = [0, 0, pi/6]';
+desideredState.rDes = [1, 1.4, 2]';      % [m]
+desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
@@ -156,14 +156,16 @@ else
 
     % Initialize Drone
     myDrone = Drone(params, x0, desideredState, gains, tspan, control);
-    myDrone.linearizeHovering();
+    % myDrone.linearizeHovering();
 
     % Simulation
     t = 0;
     for i = 1:length(tvec)-1
-        % if ( abs(myDrone.r - desideredState.rDes) < 0.8*ones(3,1) )
-        %     myDrone.control = 2;
-        % end
+        if (myDrone.control == 3)
+            if ( abs(myDrone.r - desideredState.rDes) < 0.8*ones(3,1) )
+                myDrone.control = 2;
+            end
+        end
 
         myDrone.updateState();
         myDrone.logger();

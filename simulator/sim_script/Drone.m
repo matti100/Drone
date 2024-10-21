@@ -36,10 +36,10 @@ classdef Drone < handle
         w               % [dphi, dtheta, dpsi]
 
         u               % Inputs
-        u1              % Rotor speed 1
-        u2              % Rotor speed 2
-        u3              % Rotor speed 3
-        u4              % Rotor speed 4
+        u1              
+        u2              
+        u3              
+        u4              
 
         % Commands
         T               
@@ -62,6 +62,7 @@ classdef Drone < handle
         xDes
 
         % Errors
+        error;
         err_x; err_x_prev; err_x_prevprev; Serr_x; Derr_x;
         err_y; err_y_prev; err_y_prevprev; Serr_y; Derr_y;
         err_z; err_z_prev; err_z_prevprev; Serr_z; Derr_z;
@@ -132,9 +133,11 @@ classdef Drone < handle
         o_R_b           % [3x3]          Rotation Matrix
 
         traj            % [tx12]         Time evolution of the state
+        
+        %% Control 
+        control         % flag
 
         %% Linearization
-        linear;         % flag
 
         A; 
         B;
@@ -153,7 +156,7 @@ classdef Drone < handle
     methods
 
         %% Constructor
-        function obj = Drone(params, initialCondition, desideredState, gains, tspan, linear)
+        function obj = Drone(params, initialCondition, desideredState, gains, tspan, control)
             
             % Params
             obj.m = params.m;
@@ -195,12 +198,14 @@ classdef Drone < handle
             obj.xDes = [obj.rDes; 0; 0; 0; obj.attDes; 0; 0; 0];
            
             % Errors
-            obj.err_x = obj.rDes(1) - obj.x(1);
-            obj.err_y = obj.rDes(2) - obj.x(2);
-            obj.err_z = obj.rDes(3) - obj.x(3);
-            obj.err_phi = obj.attDes(1) - obj.x(7);
-            obj.err_theta = obj.attDes(2) - obj.x(8);
-            obj.err_psi = obj.attDes(3) - obj.x(9);
+            obj.error = obj.xDes - obj.x;
+
+            obj.err_x = obj.error(1);
+            obj.err_y = obj.error(2);
+            obj.err_z = obj.error(3);
+            obj.err_phi = obj.error(7);
+            obj.err_theta = obj.error(8);
+            obj.err_psi = obj.error(9);
 
             obj.err_x_prev = 0; obj.err_x_prevprev = 0; obj.Serr_x = 0; obj.Derr_x = 0;
             obj.err_y_prev = 0; obj.err_y_prevprev = 0; obj.Serr_y = 0; obj.Derr_y = 0;
@@ -245,12 +250,15 @@ classdef Drone < handle
 
             % Dynamics
             obj.dx = zeros(12,1);
+            obj.u = zeros(4,1);
 
             obj.traj = obj.x0';
 
+            % Control
+            obj.control = control;
+
             % Linearization
-            obj.linear = linear;
-            if (obj.linear ~= 0)
+            if (obj.control ~= 0 && obj.control ~= 3)
                 obj.linearizeHovering();
             end
 
@@ -349,7 +357,7 @@ classdef Drone < handle
             %              u4/c + ((a-b)/c)*x(10)*x(11);
             %              ];
             
-            if (abs(obj.linear) == 1)
+            if (abs(obj.control) == 1)
                 obj.dx = obj.A*obj.x + obj.B*obj.u;
             else
                 obj.o_R_b = obj.evalRotationMatrix(obj.att);
@@ -364,25 +372,35 @@ classdef Drone < handle
         %% CMD computation
         function obj = motorCMD(obj)
 
-            % MMA
-            if (obj.linear > 0)
-                obj.u_lin = obj.K * (obj.xDes - obj.x);
-                obj.u1 = obj.u_lin(1);
-                obj.u2 = obj.u_lin(2);
-                obj.u3 = obj.u_lin(3);
-                obj.u4 = obj.u_lin(4);
+            if (obj.control == 3) % MPC
+                if (mod(length(obj.t), 5) == 0)
+                    obj.u = obj.MPC();
+                    % obj.u(1) = obj.u(1) + obj.m*obj.g;
+                else
+                    obj.u = obj.u;
+                end
             else
-                obj.u1 = obj.altitudeCtrl();         % -> U1
-                obj.attDes(1) = obj.phiCtrl();       % -> phi_des
-                obj.xDes(7) = obj.attDes(1);
-                obj.attDes(2) = obj.thetaCtrl();     % -> theta_des
-                obj.xDes(8) = obj.attDes(2);
-                obj.u2 = obj.RCtrl();                % -> U2 = Mx
-                obj.u3 = obj.PCtrl();                % -> U3 = My
-                obj.u4 = obj.YCtrl();                % -> U4 = Mz
+                if (obj.control > 0)
+                    % LQR
+                    obj.u_lin = obj.K * (obj.xDes - obj.x);
+                    obj.u1 = obj.u_lin(1);
+                    obj.u2 = obj.u_lin(2);
+                    obj.u3 = obj.u_lin(3);
+                    obj.u4 = obj.u_lin(4);
+                else
+                    % PID
+                    obj.u1 = obj.altitudeCtrl();         % -> T
+                    obj.attDes(1) = obj.phiCtrl();       % -> phi_des
+                    obj.xDes(7) = obj.attDes(1);
+                    obj.attDes(2) = obj.thetaCtrl();     % -> theta_des
+                    obj.xDes(8) = obj.attDes(2);
+                    obj.u2 = obj.RCtrl();                % -> U2 = Mx
+                    obj.u3 = obj.PCtrl();                % -> U3 = My
+                    obj.u4 = obj.YCtrl();                % -> U4 = Mz
+                end
+
+                obj.u = [obj.u1; obj.u2; obj.u3; obj.u4];
             end
-            
-            obj.u = [obj.u1; obj.u2; obj.u3; obj.u4];
         end
 
         function obj = cmdForceTorque(obj)
@@ -391,14 +409,14 @@ classdef Drone < handle
 
             obj.F = [0;
                      0;
-                     obj.u1];
+                     obj.u(1)];
             obj.Fx = obj.F(1);
             obj.Fy = obj.F(2);
             obj.Fz = obj.F(3);
 
-            obj.M = [obj.u2;
-                     obj.u3;
-                     obj.u4];
+            obj.M = [obj.u(2);
+                     obj.u(3);
+                     obj.u(4)];
             obj.Mx = obj.M(1);
             obj.My = obj.M(2);
             obj.Mz = obj.M(3);
@@ -435,6 +453,16 @@ classdef Drone < handle
             obj.dV = [obj.dV, dV];
             
             % Update Error
+            if (obj.control == 3)
+                obj.error = obj.xDes - obj.x;
+                obj.err_x = obj.error(1);
+                obj.err_y = obj.error(2);
+                obj.err_z = obj.error(3);
+                obj.err_phi = obj.error(7);
+                obj.err_theta = obj.error(8);
+                obj.err_psi = obj.error(9);
+            end
+
             obj.Err_x = [obj.Err_x, obj.err_x];
             obj.Err_y = [obj.Err_y, obj.err_y];
             obj.Err_z = [obj.Err_z, obj.err_z];
@@ -513,8 +541,119 @@ classdef Drone < handle
 
             end
         end
-        
+
         %% Controllers
+
+        % Model Predictive Controller (non-linear)
+        function u_mpc = MPC(obj)
+
+            % Define parameters
+            dT = 0.1;                % time interval
+            N = 25;                     % Prediction horizon
+            % alpha = 0.001;
+            % du = 0.01;
+            % grad_iters = 100;
+
+            % Initial conditions
+            x_0 = obj.x;
+
+            % Desired state
+            x_des = obj.xDes;
+
+            % Inputs limits
+            u_min = repmat([0; -100; -100; -100], N, 1);  % Repeat min limits N times
+            u_max = repmat([100; 100; 100; 100], N, 1);   % Repeat max limits N times
+
+            % Weigthing matrix
+            Q = eye(6)*10;
+            % Q(3,3) = Q(3,3);
+            Q(3,3) = 100;
+            Q(6,6) = 50;
+            R = eye(4)*5;
+
+            % Dynamics
+            f = @(x, u) [x(4);
+                x(5);
+                x(6);
+                (1/obj.m)*( sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)) )*u(1);
+                (1/obj.m)*( -cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)) )*u(1);
+                (1/obj.m)*cos(x(8))*cos(x(7))*u(1) - obj.g;
+                x(10);
+                x(11);
+                x(12);
+                (u(2)/obj.Ix) + (obj.Iy-obj.Iz)*x(11)*x(12)/obj.Ix;
+                (u(3)/obj.Iy) + (obj.Iz-obj.Ix)*x(10)*x(12)/obj.Iy;
+                (u(4)/obj.Iz) + (obj.Ix-obj.Iy)*x(10)*x(11)/obj.Iz
+                ];
+
+
+            % Optimal u
+            options = optimoptions('fmincon', ...
+                'Algorithm', 'interior-point', ...                 % Algoritmo scelto
+                'MaxFunctionEvaluations', 50000, ...     % Limite massimo delle valutazioni
+                'MaxIterations', 1000, ...               % Limite massimo delle iterazioni
+                'Display', 'final', ...                   % Mostra il progresso
+                'UseParallel',false,...
+                'FiniteDifferenceType', 'central');  % Differenze finite più accurate
+            [u_opt, fval] = fmincon(@(u) cost_function(x_0, u, x_des, Q, R, N, f, dT), ...
+                zeros(4*N, 1), [], [], [], [], u_min, u_max, [], options);
+
+            u_mpc = u_opt(1:4);
+
+            % Cost function
+            function J = cost_function(x0, u, xref, Q, R, N, f, dt)
+                J = 0;
+                x = x0;
+                for k = 1:N
+                    u_k = u((k-1)*4+1:k*4); % Prendi l'input di controllo per il k-esimo passo
+                    x = f(x, u_k) * dt + x; % Propaga lo stato con la dinamica non lineare
+                    err_lin = x(1:3) - xref(1:3);
+                    err_ang = x(7:9) - xref(7:9);
+                    err = [err_lin; err_ang];
+                    J = J + err' * Q * err + u_k' * R * u_k; % Funzione di costo
+                end
+            end
+
+            % % Gradient optimization
+            % for i = 1:grad_iters
+            %
+            % J = 0;
+            % J1 = zeros(4,1);
+            % grad_J = zeros(4,1);
+            %
+            %     for k = 1:N
+            %
+            %         u_k = U(k, :)';
+            %         x_prev = x;
+            %         x = x + f(x, u_k) * dT;
+            %
+            %         error = x_des - x;
+            %
+            %         J = J + (error'*Q*error) + u_k'*R*u_k;
+            %
+            %         for j = 1:4
+            %             u1 = u_k;
+            %             u1(j) = u1(j) + du;
+            %             x1 = x_prev + f(x_prev, u1);
+            %
+            %             error1 = x_des - x1;
+            %             J1(j) = J1(j) + error1'*Q*error1 + u1'*R*u1;
+            %         end
+            %
+            %         grad_J = (J1 - J.*ones(4,1))./du;
+            %
+            %         U(k, :) = U(k, :) - alpha.*grad_J';
+            %
+            %     end
+            %
+            %     % U(1, :)
+            %
+            % end
+            % u_mpc = U(1, :);
+
+        end
+
+
         % Altitude controller
         function T = altitudeCtrl(obj)
             % Error computation
@@ -768,7 +907,7 @@ classdef Drone < handle
             % fprintf('R: \t %f\t|\t', obj.R);
             % fprintf('phi_des: \t %f [deg]\t|\t', obj.attDes(1));
             fprintf('Err (x, y, z):\t [%f, %f, %f] [m] |\t', obj.err_x, obj.err_y, obj.err_z);
-            fprintf('Attitude:\t [%f, %f, %f] |\t', obj.att);
+            % fprintf('Attitude:\t [%f, %f, %f] |\t', obj.att);
             fprintf('Altitude:\t %f [m] |\t', obj.x(3));
 
             % fprintf('W:\t [%f, %f, %f]', obj.w);
