@@ -49,6 +49,9 @@ public:
   float pitchRate;
   float yawRate;
 
+  float zAccel_filtered;
+  float zAccel_prev;
+
   float lift;
   float kF;
   float kM;

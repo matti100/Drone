@@ -187,6 +187,11 @@ void MPU6050::calibration() {
   RateCalibrationRoll /= 5000;
   RateCalibrationPitch /= 5000;
   RateCalibrationYaw /= 5000;
+
+  // compute zAccel_prev
+  accel_meas();
+  zAccel -= AccelCalibrationZ;
+  zAccel_prev = zAccel;
 }
 
 // -------------- POST PROCESSING SIGNALS --------------
@@ -196,6 +201,8 @@ void MPU6050::process_signals() {
 
 // -------------- ACQUISITION --------------
 void MPU6050::get_meas() {
+  zAccel_prev = zAccel;
+
   // ACCELEROMETER
   accel_meas();
   // Update with calibration data
@@ -214,6 +221,10 @@ void MPU6050::get_meas() {
   rollRate -= RateCalibrationRoll;
   pitchRate -= RateCalibrationPitch;
   yawRate -= RateCalibrationYaw;
+
+  float alpha = 0.5;
+  zAccel_filtered = alpha * zAccel + (1.0 - alpha) * zAccel_prev;
+  zAccel = zAccel_filtered;
 }
 
 // -------------- COMPUTE LIFT-TORQUE COEFFICIENTS --------------

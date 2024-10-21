@@ -29,10 +29,12 @@ params.rotRad = 0.1;        % [m]                % rotor radius
 k_f = 6.11e-8;   % [N / rpm]         % Lift Coefficient
 params.k_f = 0.02;
 params.k_f = 192.32*1e-7;
+params.k_f = 1.4*1e-5 / 9.54929658;
 % params.k_f = (k_f)*60/6.28;                % [N/rad/s]
 k_m = 1.5e-9;    % [N*m / rpm]       % Torque Coefficient
 params.k_m = 0.01;
 params.k_m = 4.003*1e-7;
+params.k_m = 1.78*1e-6 / 9.54929658;
 % params.k_m = (k_m)*60/6.28;                % [N/rad/s]
 
 % Gravitational Data

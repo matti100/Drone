@@ -55,9 +55,9 @@ void loop() {
   Motors.setVelocity(vel, vel, vel, vel);
 
   IMU.computeLiftTorqueCoefficients(vel);
-  Serial.print("zAccel:");
-  Serial.print(IMU.zAccel);
-  Serial.print("\tLift:");
+  Serial.print("\tzAccel:");
+  Serial.print(IMU.zAccel_filtered);
+  Serial.print("\t\tLift:");
   Serial.print(IMU.lift);
   Serial.print("\tInput command:");
   Serial.print(input);
@@ -66,7 +66,7 @@ void loop() {
   delay(100);
 }
 
-
+// Serial Input
 void serialEvent() {
   while (Serial.available()) {
 
@@ -81,6 +81,7 @@ void serialEvent() {
     }
   }
 }
+
 
 /*
 
