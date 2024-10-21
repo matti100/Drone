@@ -52,8 +52,8 @@ x0(9) = 0;
 
 % Desidered Position
 desideredState = struct();
-desideredState.rDes = [1, 0, 2]';      % [m]
-desideredState.attDes = [0, 0, pi/6]';
+desideredState.rDes = [0.5, 0, 1]';      % [m]
+desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
@@ -128,27 +128,27 @@ else
     disp('------------ Simulation -----------');
     disp('-----------------------------------');
 
-    % Manual tuning                             % I set                 II set
-    kP = [20;           % -> kP_T                  20                     20
-          -0.4;            % -> kP_phi                0
-          0.4;          % -> kP_theta              0.4
-          1;            % -> kP_R                  1                      1.55
-          1;            % -> kP_P                  1                      1.55
-          1.2];         % -> kP_Y                  0.1                  x 0.02
+    % Manual tuning                         % I set                 II set
+    kP = [20;        % -> kP_T                  20                     20
+          0;        % -> kP_phi                0
+          0.4;        % -> kP_theta              0
+          1;        % -> kP_R                   1                      1.55
+          1;        % -> kP_P                   1                      1.55
+          0.1];       % -> kP_Y                   0.1                  x 0.02
 
-    kI = [10;           % -> kI_T                  10                     10
-          -0.09;            % -> kI_phi                0
-          0.09;         % -> kI_theta              0.09
-          0.13;         % -> kI_R                  0.13                   0.17
-          0.13;         % -> KI_P                  0.13                   0.17
-          0.03];       % -> KI_Y                  0.013                x 0.01
+    kI = [10;        % -> kI_T                 10                     10
+          0;        % -> kI_phi                0
+          0.2;        % -> kI_theta              0
+          0.13;        % -> kI_R            0.13                   0.17
+          0.13;        % -> KI_P               0.13                   0.17
+          0.013];        % -> KI_Y             0.013                x 0.01
 
-    kD = [10;           % -> kD_T                  10                     10
-          -0.25;         % -> kD_phi                0
-          0.25;         % -> kD_theta              0.25
-          0.66;         % -> kD_R                  0.66                   0.76
-          0.66;         % -> kD_P                  0.66                   0.76
-          0.9];       % -> kD_Y                  0.066                x 0.01
+    kD = [10;        % -> kD_T                 10                     10
+          0;        % -> kD_phi                0
+          1;        % -> kD_theta              0
+          0.66;        % -> kD_R            0.66                   0.76
+          0.66;        % -> kD_P               0.66                   0.76
+          0.066];       % -> kD_Y              0.066                x 0.01
     
     % load("tunedGains_ga.mat");
     % gains = tunedGains;
