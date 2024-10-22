@@ -133,11 +133,24 @@ classdef Drone < handle
         o_R_b           % [3x3]          Rotation Matrix
 
         traj            % [tx12]         Time evolution of the state
+
+        f               % handel function for system dynamics
+        Force
+        Torque
+        rotMat
+        R_phi
+        R_theta
+        R_psi
+
+        func
+       
         
         %% Control 
         control         % flag
 
         %% Linearization
+
+        f_lin;
 
         A; 
         B;
@@ -147,6 +160,35 @@ classdef Drone < handle
         K;
         u_lin;
 
+        %% Guidance
+
+        %% Navigation
+        sigma_acc;
+        sigma_gyro;
+        noise_acc;
+        noise_gyro;
+
+        acc_meas;
+        gyro_meas;
+
+        x_pred;
+        P_pred;
+        h_x_pred;
+
+        x_est;
+        r_est;
+        dr_est;
+        att_est;
+        w_est;
+        P_est;
+
+        y;
+        
+        Kg;
+        h;
+        Q;
+        R_cov;
+    
         %% Lyapunov
         V
         dV
@@ -252,7 +294,79 @@ classdef Drone < handle
             obj.dx = zeros(12,1);
             obj.u = zeros(4,1);
 
+            % obj.f = @(x, u) [x(4);
+            %     x(5);
+            %     x(6);
+            %     (1/obj.m)*( sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)) )*u(1);
+            %     (1/obj.m)*( -cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)) )*u(1);
+            %     (1/obj.m)*cos(x(8))*cos(x(7))*u(1) - obj.g;
+            %     x(10);
+            %     x(11);
+            %     x(12);
+            %     (u(2)/obj.Ix) + (obj.Iy-obj.Iz)*x(11)*x(12)/obj.Ix;
+            %     (u(3)/obj.Iy) + (obj.Iz-obj.Ix)*x(10)*x(12)/obj.Iy;
+            %     (u(4)/obj.Iz) + (obj.Ix-obj.Iy)*x(10)*x(11)/obj.Iz
+            %     ];
+            
+            obj.R_psi = @(x) [cos(x(9)),    -sin(x(9)),     0;
+                              sin(x(9)),     cos(x(9)),     0;
+                                      0,             0,     1];
+
+            obj.R_theta = @(x) [cos(x(8)),      0,      sin(x(8));
+                                        0,      1,              0;
+                                -sin(x(8)),     0,       cos(x(8))];
+
+            obj.R_phi = @(x) [1,        0,              0;
+                              0,        cos(x(7)),      -sin(x(7));
+                              0,        sin(x(7)),      cos(x(7))];
+
+            obj.rotMat = @(x) obj.R_psi(x) * obj.R_theta(x) * obj.R_phi(x);
+
+            obj.Force = @(u) [0;
+                              0;
+                              u(1)];
+
+            obj.Torque = @(u) [u(2);
+                               u(3);
+                               u(4)];
+
+            obj.f = @(x, u) [x(4:6);
+                (1/obj.m).*obj.rotMat(x)*obj.Force(u) + [0; 0; -obj.g];
+                x(10:12);
+                obj.I \ (obj.Torque(u) - cross(x(10:12), obj.I*x(10:12)))
+                ];
+
+            obj.f_lin = @(x, u) obj.A*x + obj.B*u;
+
+            if (abs(obj.control) == 1)
+                obj.func = obj.f_lin;
+            else
+                obj.func = obj.f;
+            end
+
             obj.traj = obj.x0';
+
+            % Guidance
+            obj.sigma_acc = 0.2;
+            obj.sigma_gyro = 0.1;
+
+            obj.x_est = obj.x;
+            obj.r_est = obj.x_est(1:3);
+            obj.dr_est = obj.x_est(4:6);
+            obj.att_est = obj.x_est(7:9);
+            obj.w_est = obj.x_est(10:12);
+            obj.P_est = zeros(12,12);
+
+            obj.h = @(x) [(x(4) - obj.traj(end, 1))./obj.dt;
+                (x(5) - obj.traj(end, 2))./obj.dt;
+                (x(6) - obj.traj(end, 3))./obj.dt;
+                x(10);
+                x(11);
+                x(12)
+                ];
+
+            obj.Q = ones(12,12);
+            obj.R_cov = ones(6,6);
 
             % Control
             obj.control = control;
@@ -429,14 +543,20 @@ classdef Drone < handle
             obj.t = [obj.t; obj.t(end) + obj.dt];
 
             % Compute motor cmd
-            obj.cmdForceTorque();
- 
+            % obj.cmdForceTorque();
+            obj.motorCMD;
+
             % Build system of odes
-            obj.ODEs();
+            % obj.ODEs();
             
             % Integrate system of odes.
-            obj.x = obj.x + (obj.dx .* obj.dt);
+            % obj.x = obj.x + (obj.dx .* obj.dt);
+            obj.x = obj.x + ( obj.func(obj.x, obj.u) * obj.dt );
 
+            % State estimation
+            % obj.estimator();
+            % obj.x = obj.x_est;
+            
             % Update each state
             obj.r = obj.x(1:3);
             obj.dr = obj.x(4:6);
@@ -541,6 +661,93 @@ classdef Drone < handle
 
             end
         end
+
+        %% Guidance
+        
+        % Estimator
+        function obj = estimator(obj)
+            obj.noise_acc = obj.sigma_acc .* randn(3, 1);
+            obj.acc_meas = obj.dx(4:6) + obj.noise_acc;
+            
+            obj.noise_gyro = obj.sigma_gyro .* randn(3, 1);
+            obj.gyro_meas = obj.dx(10:12) + obj.noise_gyro;
+
+            obj.y = [obj.acc_meas; obj.gyro_meas];
+
+            obj.KalmanFilter();
+
+            obj.r_est = obj.x_est(1:3);
+            obj.dr_est = obj.x_est(4:6);
+            obj.att_est = obj.x_est(7:9);
+            obj.w_est = obj.x_est(10:12);
+        end
+
+        % Kalman filter
+        function obj = KalmanFilter(obj) 
+
+            % Prediction
+            obj.x_pred = obj.f(obj.x_est, obj.u);
+
+            AJ = JacobianA(obj, obj.f, obj.x_est);
+
+            obj.P_pred = AJ * obj.P_est * AJ' + obj.Q;
+
+            % Correction
+            obj.h_x_pred = obj.h(obj.x_pred);
+            HJ = JacobianH(obj, obj.h, obj.x_pred);
+
+            % Kalman Gain
+            obj.Kg = obj.P_pred * HJ' / (HJ * obj.P_pred * HJ' + obj.R_cov);
+
+            % Estimation
+            obj.x_est = obj.x_pred + ( obj.Kg * (obj.y - obj.h_x_pred));
+
+            obj.P_est = (eye(12,12) - obj.Kg * HJ) * obj.P_pred;
+        end
+
+        function J = JacobianA(obj, f, x)
+            dX = 0.01;
+            J = zeros(12, 12);
+            j = f(x, obj.u);
+
+            % Row
+            for i = 1:12
+                % Column
+                for k = 1:12
+
+                    xEst1 = x;
+
+                    xEst1(k) = x(k) + dX;
+
+                    j1 = f(xEst1, obj.u);
+
+                    J(k, i) = (j1(k) - j(k)) / dX;
+                end
+            end
+        end
+
+        function J = JacobianH(obj, f, x)
+            dX = 0.01;
+            J = zeros(6, 6);
+            j = f(x);
+
+            % Row
+            for i = 1:12
+                % Column
+                for k = 1:6
+
+                    xEst1 = x;
+
+                    xEst1(k) = x(k) + dX;
+
+                    j1 = f(xEst1);
+
+                    J(k, i) = (j1(k) - j(k)) / dX;
+                end
+            end
+        end
+       
+
 
         %% Controllers
 
