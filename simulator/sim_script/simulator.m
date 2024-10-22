@@ -54,7 +54,7 @@ x0(9) = 0;
 
 % Desidered Position
 desideredState = struct();
-desideredState.rDes = [1, 1.4, 2]';      % [m]
+desideredState.rDes = [1, -1, 2]';      % [m]
 desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time

@@ -34,6 +34,7 @@ classdef Drone < handle
         dr              % [dx, dy, dz]
         att             % [phi, theta, psi]
         w               % [dphi, dtheta, dpsi]
+        dx
 
         u               % Inputs
         u1              
@@ -46,8 +47,6 @@ classdef Drone < handle
         R
         P
         Y
-
-        dx              % System of odes
 
         % Initial conditions
         x0             
@@ -108,57 +107,39 @@ classdef Drone < handle
 
 
         %% Dynamics
-        F               % [3x1] [N]      External Force
+        F               % [3x1] [N]         External Force
         Fx                   
         Fy
         Fz
 
-        T1              % [N]            Rotor Thrust
-        T2
-        T3
-        T4
-
-        Weight          % [3x1]          Weight force
-
-        C1              % [Nm]           Rotor torque
-        C2
-        C3
-        C4
-
-        M               % [3x1] [Nm]     External Torque
+        M               % [3x1] [Nm]        External Torque
         Mx
         My
         Mz
 
-        o_R_b           % [3x3]          Rotation Matrix
+        traj            % [tx12]            Time evolution of the state
 
-        traj            % [tx12]         Time evolution of the state
+        f               % [function hanlde] System dynamics
+        Force          
+        Torque          
+        rotMat          
+        R_phi           
+        R_theta         
+        R_psi           
+        func            
 
-        f               % handel function for system dynamics
-        Force
-        Torque
-        rotMat
-        R_phi
-        R_theta
-        R_psi
+        % Linearization
 
-        func
-       
-        
+        f_lin;          % [function handle] Linearized System dynamics
+
+        A;              % [12x12]           State space matrix
+        B;              % [12x4]            Control matrix
+
+        K;              % [4x4]             LQR gain matrix
+        u_lin;          % [4x1]             LQR control 
+
         %% Control 
-        control         % flag
-
-        %% Linearization
-
-        f_lin;
-
-        A; 
-        B;
-        C;
-        D;
-
-        K;
-        u_lin;
+        control         % control flag
 
         %% Guidance
 
@@ -233,6 +214,7 @@ classdef Drone < handle
             obj.dr = obj.dr0;
             obj.att = obj.att0;
             obj.w = obj.w0;
+            obj.dx = zeros(12,1);
 
             % Desidered State
             obj.rDes = desideredState.rDes;
@@ -263,50 +245,11 @@ classdef Drone < handle
             obj.Err_theta = obj.err_theta;
             obj.Err_psi = obj.err_psi;
 
-            % % Controllers gains
-            % obj.kP_T = gains.kP_T;
-            % obj.kI_T = gains.kI_T;
-            % obj.kD_T = gains.kD_T;
-            % 
-            % obj.kP_phi = gains.kP_phi;
-            % obj.kI_phi = gains.kI_phi;
-            % obj.kD_phi = gains.kD_phi;
-            % 
-            % obj.kP_theta = gains.kP_theta;
-            % obj.kI_theta = gains.kI_theta;
-            % obj.kD_theta = gains.kD_theta;
-            % 
-            % obj.kP_R = gains.kP_R;
-            % obj.kI_R = gains.kI_R;
-            % obj.kD_R = gains.kD_R;
-            % 
-            % obj.kP_P = gains.kP_P;
-            % obj.kI_P = gains.kI_P;
-            % obj.kD_P = gains.kD_P;
-            % 
-            % obj.kP_Y = gains.kP_Y;
-            % obj.kI_Y = gains.kI_Y;
-            % obj.kD_Y = gains.kD_Y;
-
+            % PID gains
             updateGains(obj, gains);
 
             % Dynamics
-            obj.dx = zeros(12,1);
             obj.u = zeros(4,1);
-
-            % obj.f = @(x, u) [x(4);
-            %     x(5);
-            %     x(6);
-            %     (1/obj.m)*( sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)) )*u(1);
-            %     (1/obj.m)*( -cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)) )*u(1);
-            %     (1/obj.m)*cos(x(8))*cos(x(7))*u(1) - obj.g;
-            %     x(10);
-            %     x(11);
-            %     x(12);
-            %     (u(2)/obj.Ix) + (obj.Iy-obj.Iz)*x(11)*x(12)/obj.Ix;
-            %     (u(3)/obj.Iy) + (obj.Iz-obj.Ix)*x(10)*x(12)/obj.Iy;
-            %     (u(4)/obj.Iz) + (obj.Ix-obj.Iy)*x(10)*x(11)/obj.Iz
-            %     ];
             
             obj.R_psi = @(x) [cos(x(9)),    -sin(x(9)),     0;
                               sin(x(9)),     cos(x(9)),     0;
@@ -355,7 +298,7 @@ classdef Drone < handle
             obj.dr_est = obj.x_est(4:6);
             obj.att_est = obj.x_est(7:9);
             obj.w_est = obj.x_est(10:12);
-            obj.P_est = zeros(12,12);
+            obj.P_est = eye(12);
 
             obj.h = @(x) [(x(4) - obj.traj(end, 1))./obj.dt;
                 (x(5) - obj.traj(end, 2))./obj.dt;
@@ -365,8 +308,9 @@ classdef Drone < handle
                 x(12)
                 ];
 
-            obj.Q = ones(12,12);
-            obj.R_cov = ones(6,6);
+            obj.Q = eye(12);
+            obj.R_cov = diag([obj.sigma_acc.*ones(3,1).^2; ...
+                              obj.sigma_gyro.*ones(3,1)].^2);
 
             % Control
             obj.control = control;
@@ -426,62 +370,6 @@ classdef Drone < handle
         function state = getState(obj)
             state = obj.x;
         end
-    
-        %% Dynamics
-        function o_R_b = evalRotationMatrix(obj, angles)
-            phi = angles(1);
-            theta = angles(2);
-            psi = angles(3);
-
-            % Rotation around Z axis (yaw)
-            R_psi = [cos(psi),       -sin(psi),        0;
-                     sin(psi),        cos(psi),        0;
-                            0,               0,        1];
-
-            % Rotation around Y' axis (pitch)
-            R_theta = [cos(theta),     0,      sin(theta);
-                                0,     1,               0;
-                      -sin(theta),     0,      cos(theta)];
-
-            % Rotation around X'' axis (roll)
-            R_phi = [1,                0,                0;
-                     0,         cos(phi),        -sin(phi);
-                     0,         sin(phi),        cos(phi)];
-            
-            % Rotation matrix from o -> b
-            o_R_b = R_psi * R_theta * R_phi;
-            % Rotation matrix from b -> o
-            % o_R_b = o_R_b';
-        end
-
-        function obj = ODEs(obj)
-            % Non-linear ODE system
-            % F = @(t,x,u) [
-            %              x(4);
-            %              x(5);
-            %              x(6);
-            %              (k_f/m)*(sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)))*u1;
-            %              (k_f/m)*(-cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)))*u1);
-            %              (k_f/m)*(cos(x(8))*cos(x(7)))*u1 - g;
-            %              x(10);
-            %              x(11);
-            %              x(12);
-            %              u2/a + ((b-c)/a)*x(11)*x(12);
-            %              u3/b + ((c-a)/b)*x(10)*x(12);
-            %              u4/c + ((a-b)/c)*x(10)*x(11);
-            %              ];
-            
-            if (abs(obj.control) == 1)
-                obj.dx = obj.A*obj.x + obj.B*obj.u;
-            else
-                obj.o_R_b = obj.evalRotationMatrix(obj.att);
-                obj.dx(1:3) = obj.dr;
-                obj.dx(4:6) = ( (1/obj.m) .* obj.o_R_b * obj.F ) + [0; 0; -obj.g];
-                obj.dx(7:9) = obj.w;
-                obj.dx(10:12) = obj.I \ (obj.M - cross(obj.w, obj.I*obj.w));
-            end
-
-        end
 
         %% CMD computation
         function obj = motorCMD(obj)
@@ -517,20 +405,21 @@ classdef Drone < handle
             end
         end
 
-        function obj = cmdForceTorque(obj)
+        function obj = integrateSystem(obj)
 
             obj.motorCMD();
 
-            obj.F = [0;
-                     0;
-                     obj.u(1)];
+            % Integrate system of odes.
+            obj.dx = obj.func(obj.x, obj.u);
+            obj.x = obj.x + ( obj.dx .* obj.dt );
+
+            % Update external force, torque 
+            obj.F = obj.Force(obj.u);
             obj.Fx = obj.F(1);
             obj.Fy = obj.F(2);
             obj.Fz = obj.F(3);
 
-            obj.M = [obj.u(2);
-                     obj.u(3);
-                     obj.u(4)];
+            obj.M = obj.Torque(obj.u);
             obj.Mx = obj.M(1);
             obj.My = obj.M(2);
             obj.Mz = obj.M(3);
@@ -541,17 +430,9 @@ classdef Drone < handle
 
             % Update time 
             obj.t = [obj.t; obj.t(end) + obj.dt];
-
-            % Compute motor cmd
-            % obj.cmdForceTorque();
-            obj.motorCMD;
-
-            % Build system of odes
-            % obj.ODEs();
             
             % Integrate system of odes.
-            % obj.x = obj.x + (obj.dx .* obj.dt);
-            obj.x = obj.x + ( obj.func(obj.x, obj.u) * obj.dt );
+            obj.integrateSystem();
 
             % State estimation
             % obj.estimator();
@@ -686,9 +567,9 @@ classdef Drone < handle
         function obj = KalmanFilter(obj) 
 
             % Prediction
-            obj.x_pred = obj.f(obj.x_est, obj.u);
+            obj.x_pred = obj.func(obj.x_est, obj.u);
 
-            AJ = JacobianA(obj, obj.f, obj.x_est);
+            AJ = JacobianA(obj, obj.func, obj.x_est);
 
             obj.P_pred = AJ * obj.P_est * AJ' + obj.Q;
 
@@ -778,21 +659,20 @@ classdef Drone < handle
             Q(6,6) = 50;
             R = eye(4)*5;
 
-            % Dynamics
-            f = @(x, u) [x(4);
-                x(5);
-                x(6);
-                (1/obj.m)*( sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)) )*u(1);
-                (1/obj.m)*( -cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)) )*u(1);
-                (1/obj.m)*cos(x(8))*cos(x(7))*u(1) - obj.g;
-                x(10);
-                x(11);
-                x(12);
-                (u(2)/obj.Ix) + (obj.Iy-obj.Iz)*x(11)*x(12)/obj.Ix;
-                (u(3)/obj.Iy) + (obj.Iz-obj.Ix)*x(10)*x(12)/obj.Iy;
-                (u(4)/obj.Iz) + (obj.Ix-obj.Iy)*x(10)*x(11)/obj.Iz
-                ];
-
+            % % Dynamics
+            % f = @(x, u) [x(4);
+            %     x(5);
+            %     x(6);
+            %     (1/obj.m)*( sin(x(9))*sin(x(7)) + cos(x(9))*sin(x(8))*cos(x(7)) )*u(1);
+            %     (1/obj.m)*( -cos(x(9))*sin(x(7)) + sin(x(9))*sin(x(8))*cos(x(7)) )*u(1);
+            %     (1/obj.m)*cos(x(8))*cos(x(7))*u(1) - obj.g;
+            %     x(10);
+            %     x(11);
+            %     x(12);
+            %     (u(2)/obj.Ix) + (obj.Iy-obj.Iz)*x(11)*x(12)/obj.Ix;
+            %     (u(3)/obj.Iy) + (obj.Iz-obj.Ix)*x(10)*x(12)/obj.Iy;
+            %     (u(4)/obj.Iz) + (obj.Ix-obj.Iy)*x(10)*x(11)/obj.Iz
+            %     ];
 
             % Optimal u
             options = optimoptions('fmincon', ...
@@ -802,7 +682,7 @@ classdef Drone < handle
                 'Display', 'final', ...                   % Mostra il progresso
                 'UseParallel',false,...
                 'FiniteDifferenceType', 'central');  % Differenze finite più accurate
-            [u_opt, fval] = fmincon(@(u) cost_function(x_0, u, x_des, Q, R, N, f, dT), ...
+            [u_opt, fval] = fmincon(@(u) cost_function(x_0, u, x_des, Q, R, N, obj.f, dT), ...
                 zeros(4*N, 1), [], [], [], [], u_min, u_max, [], options);
 
             u_mpc = u_opt(1:4);
@@ -859,7 +739,6 @@ classdef Drone < handle
             % u_mpc = U(1, :);
 
         end
-
 
         % Altitude controller
         function T = altitudeCtrl(obj)
@@ -959,11 +838,6 @@ classdef Drone < handle
                                obj.trap(obj.err_phi, obj.err_phi_prev);
             end
 
-            % % Limit the integral term to avoid windup
-            % max_integral = 5;
-            % min_integral = -5;
-            % obj.Serr_phi = max(min(obj.Serr_phi, max_integral), min_integral);
-
             obj.Derr_phi = obj.bkwFD(obj.err_phi, obj.err_phi_prev);
 
             % PID controller
@@ -971,34 +845,6 @@ classdef Drone < handle
                 obj.kI_R * obj.Serr_phi + ...
                 obj.kD_R * obj.Derr_phi;
         end
-
-        % % Roll controller - y_error based 
-        % % Control Y position
-        % function R = RCtrl(obj)
-        %     % Error computation
-        %     if (length(obj.t) > 1)      % err_y_prevprev available  
-        %         % Error computation
-        %         obj.err_y_prevprev = obj.err_y_prev;
-        %         obj.err_y_prev = obj.err_y;
-        %         obj.err_y = obj.rDes(2) - obj.x(2); % y_des - y
-        % 
-        %         obj.Serr_y = obj.Serr_y + ...
-        %                        obj.simpson(obj.err_y, obj.err_y_prev, obj.err_y_prevprev);
-        %     else
-        %         obj.err_y_prev = obj.err_y;
-        %         obj.err_y = obj.rDes(2) - obj.x(2); 
-        % 
-        %         obj.Serr_y = obj.Serr_y + ...
-        %                      obj.trap(obj.err_y, obj.err_y_prev);
-        %     end
-        % 
-        %     obj.Derr_y = obj.bkwFD(obj.err_y, obj.err_y_prev);
-        % 
-        %     % PID controller
-        %     R = obj.kP_R * obj.err_y + ...
-        %         obj.kI_R * obj.Serr_y + ...
-        %         obj.kD_R * obj.Derr_y;
-        % end
 
         % Pitch controller - theta_error based
         % Control X position
@@ -1026,33 +872,6 @@ classdef Drone < handle
                 obj.kI_P * obj.Serr_theta + ...
                 obj.kD_P * obj.Derr_theta;
         end
-
-        % % Pitch controller - x_error based
-        % % Control X position
-        % function P = PCtrl(obj)
-        %     % Error computation
-        %     if (length(obj.t) > 1)       % err_y_prevprev available
-        %         obj.err_x_prevprev = obj.err_x_prev;
-        %         obj.err_x_prev = obj.err_x;
-        %         obj.err_x = obj.rDes(1) - obj.x(1); % x_des - x
-        % 
-        %         obj.Serr_x = obj.Serr_x + ...
-        %                        obj.simpson(obj.err_x, obj.err_x_prev, obj.err_x_prevprev);
-        %     else
-        %         obj.err_x_prev = obj.err_x;
-        %         obj.err_x = obj.rDes(2) - obj.x(2); % x_des - x
-        % 
-        %         obj.Serr_x = obj.Serr_x + ...
-        %                        obj.trap(obj.err_x, obj.err_x_prev);
-        %     end
-        % 
-        %     obj.Derr_x = obj.bkwFD(obj.err_x, obj.err_x_prev);
-        % 
-        %     % PID controller
-        %     P = obj.kP_P * obj.err_x + ...
-        %         obj.kI_P * obj.Serr_x + ...
-        %         obj.kD_P * obj.Derr_x;
-        % end
 
         % Yaw controller
         function Y = YCtrl(obj)
