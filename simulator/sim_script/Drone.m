@@ -27,6 +27,9 @@ classdef Drone < handle
         tf              % [s]                % Final simulation time
         dt              % [s]                % Time interval
         tvec                                 % Time vector
+
+        sampleTime      % [s]                % sample time for the descrete system
+        counter
         
         %% State Space
         x               % [x, y, z, dx, dy, dz, phi, theta, psi, dphi, dtheta, dpsi]
@@ -36,11 +39,13 @@ classdef Drone < handle
         w               % [dphi, dtheta, dpsi]
         dx
 
-        u               % Inputs
+        u               % [4x1] Inputs
+        u_old
         u1              
         u2              
         u3              
-        u4              
+        u4     
+        U               % [tx4] Input Matrix
 
         % Commands
         T               
@@ -144,6 +149,8 @@ classdef Drone < handle
         %% Guidance
 
         %% Navigation
+        estimation       % estimator flag
+
         sigma_acc;
         sigma_gyro;
         noise_acc;
@@ -161,6 +168,9 @@ classdef Drone < handle
         dr_est;
         att_est;
         w_est;
+
+        traj_est;
+
         P_est;
 
         y;
@@ -179,7 +189,7 @@ classdef Drone < handle
     methods
 
         %% Constructor
-        function obj = Drone(params, initialCondition, desideredState, gains, tspan, control)
+        function obj = Drone(params, initialCondition, desideredState, gains, tspan, control, estimation, sampleTime)
             
             % Params
             obj.m = params.m;
@@ -201,6 +211,9 @@ classdef Drone < handle
             obj.dt = params.dt;
             obj.tvec = obj.t0:obj.dt:obj.tf;
 
+            obj.sampleTime = sampleTime;
+            obj.counter = 0;
+
             % State Space
             % Initial conditions
             obj.x0 = initialCondition;
@@ -215,6 +228,10 @@ classdef Drone < handle
             obj.att = obj.att0;
             obj.w = obj.w0;
             obj.dx = zeros(12,1);
+
+            obj.u = zeros(4,1);
+            obj.u_old = obj.u;
+            obj.U = obj.u';
 
             % Desidered State
             obj.rDes = desideredState.rDes;
@@ -249,8 +266,7 @@ classdef Drone < handle
             updateGains(obj, gains);
 
             % Dynamics
-            obj.u = zeros(4,1);
-            
+
             obj.R_psi = @(x) [cos(x(9)),    -sin(x(9)),     0;
                               sin(x(9)),     cos(x(9)),     0;
                                       0,             0,     1];
@@ -289,28 +305,39 @@ classdef Drone < handle
 
             obj.traj = obj.x0';
 
-            % Guidance
-            obj.sigma_acc = 0.2;
-            obj.sigma_gyro = 0.1;
+            % Navigation
+            obj.estimation = estimation;
+
+            obj.sigma_acc = 2e-3;
+            obj.sigma_gyro = 1e-3;
 
             obj.x_est = obj.x;
             obj.r_est = obj.x_est(1:3);
             obj.dr_est = obj.x_est(4:6);
             obj.att_est = obj.x_est(7:9);
             obj.w_est = obj.x_est(10:12);
+            
+            obj.traj_est = obj.x_est';
+
             obj.P_est = eye(12);
 
-            obj.h = @(x) [(x(4) - obj.traj(end, 1))./obj.dt;
-                (x(5) - obj.traj(end, 2))./obj.dt;
-                (x(6) - obj.traj(end, 3))./obj.dt;
+            % obj.h = @(x) [(x(4) - obj.traj(end, 4))./obj.dt;
+            %     (x(5) - obj.traj(end, 5))./obj.dt;
+            %     (x(6) - obj.traj(end, 6))./obj.dt;
+            %     x(10);
+            %     x(11);
+            %     x(12)
+            %     ];
+
+            obj.h = @(x) [obj.rotMat(x)' * (obj.dx(4:6) + [0;0;-obj.g]);
                 x(10);
                 x(11);
                 x(12)
                 ];
 
-            obj.Q = eye(12);
-            obj.R_cov = diag([obj.sigma_acc.*ones(3,1).^2; ...
-                              obj.sigma_gyro.*ones(3,1)].^2);
+            obj.Q = eye(12).*1e-0;
+            obj.R_cov = diag([(obj.sigma_acc^2).*ones(3,1); ...
+                              (obj.sigma_gyro^2).*ones(3,1)]);
 
             % Control
             obj.control = control;
@@ -374,13 +401,9 @@ classdef Drone < handle
         %% CMD computation
         function obj = motorCMD(obj)
 
-            if (obj.control == 3) % MPC
-                if (mod(length(obj.t), 5) == 0)
-                    obj.u = obj.MPC();
-                    % obj.u(1) = obj.u(1) + obj.m*obj.g;
-                else
-                    obj.u = obj.u;
-                end
+            if (obj.control == 3) 
+                % MPC
+                obj.u = obj.MPC();
             else
                 if (obj.control > 0)
                     % LQR
@@ -403,23 +426,30 @@ classdef Drone < handle
 
                 obj.u = [obj.u1; obj.u2; obj.u3; obj.u4];
             end
+                
+                % Saturator
+                obj.u(1) = min(100, max(0, obj.u(1)));
+                obj.u(2) = max(-100, min(100, obj.u(2)));
+                obj.u(3) = max(-100, min(100, obj.u(3)));
+                obj.u(4) = max(-100, min(100, obj.u(4)));
         end
 
-        function obj = integrateSystem(obj)
+        function obj = integrateSystem(obj, state, cmd)
 
-            obj.motorCMD();
-
-            % Integrate system of odes.
-            obj.dx = obj.func(obj.x, obj.u);
-            obj.x = obj.x + ( obj.dx .* obj.dt );
+            % Integrate system of odes
+            % Explicit Euler integration method
+            % obj.dx = obj.func(obj.x, obj.u);
+            % obj.x = obj.x + ( obj.dx .* obj.dt );
+            obj.dx = obj.func(state, cmd);
+            obj.x = state + ( obj.dx .* obj.dt );
 
             % Update external force, torque 
-            obj.F = obj.Force(obj.u);
+            obj.F = obj.Force(cmd);
             obj.Fx = obj.F(1);
             obj.Fy = obj.F(2);
             obj.Fz = obj.F(3);
 
-            obj.M = obj.Torque(obj.u);
+            obj.M = obj.Torque(cmd);
             obj.Mx = obj.M(1);
             obj.My = obj.M(2);
             obj.Mz = obj.M(3);
@@ -431,13 +461,25 @@ classdef Drone < handle
             % Update time 
             obj.t = [obj.t; obj.t(end) + obj.dt];
             
-            % Integrate system of odes.
-            obj.integrateSystem();
+            % % Update motor commands
+            % if abs(mod(obj.t(end), obj.sampleTime)) < eps * 1000
+            %     obj.motorCMD();
+            % end
 
-            % State estimation
-            % obj.estimator();
-            % obj.x = obj.x_est;
+            % Incrementa un contatore e aggiorna quando raggiunge il numero necessario
+            obj.counter = obj.counter + 1;
+            if obj.counter >= 1/(obj.dt/obj.sampleTime)
+                obj.u_old = obj.u;
+                obj.motorCMD();
+                obj.counter = 0; % Reset del contatore
+            end
+
+            % obj.motorCMD();
+            obj.U = [obj.U; obj.u'];
             
+            % Integrate system of odes.
+            obj.integrateSystem(obj.x, obj.u);
+
             % Update each state
             obj.r = obj.x(1:3);
             obj.dr = obj.x(4:6);
@@ -446,6 +488,13 @@ classdef Drone < handle
 
             % Update trajectory
             obj.traj = [obj.traj; obj.x'];
+            
+            % State estimation
+            if (obj.estimation)
+                if (mod(length(obj.t), 1/obj.sampleTime) == 0)
+                    obj.Estimator();
+                end
+            end
 
             % Update Lyapunov function
             [V, dV] = lyapunov(obj, obj.V(end));
@@ -546,12 +595,12 @@ classdef Drone < handle
         %% Guidance
         
         % Estimator
-        function obj = estimator(obj)
+        function obj = Estimator(obj)
             obj.noise_acc = obj.sigma_acc .* randn(3, 1);
-            obj.acc_meas = obj.dx(4:6) + obj.noise_acc;
+            obj.acc_meas = obj.rotMat(obj.x)'*( obj.dx(4:6) + [0;0;-obj.g] ) + obj.noise_acc;
             
             obj.noise_gyro = obj.sigma_gyro .* randn(3, 1);
-            obj.gyro_meas = obj.dx(10:12) + obj.noise_gyro;
+            obj.gyro_meas = obj.dx(7:9) + obj.noise_gyro;
 
             obj.y = [obj.acc_meas; obj.gyro_meas];
 
@@ -561,74 +610,73 @@ classdef Drone < handle
             obj.dr_est = obj.x_est(4:6);
             obj.att_est = obj.x_est(7:9);
             obj.w_est = obj.x_est(10:12);
+            obj.traj_est = [obj.traj_est; obj.x_est'];
         end
 
         % Kalman filter
         function obj = KalmanFilter(obj) 
 
             % Prediction
-            obj.x_pred = obj.func(obj.x_est, obj.u);
+            % obj.x_pred = obj.func(obj.x_est, obj.u);
+            obj.x_pred = obj.x;
 
-            AJ = JacobianA(obj, obj.func, obj.x_est);
+            AJ = obj.JacobianA(obj.func, obj.x_est);
 
             obj.P_pred = AJ * obj.P_est * AJ' + obj.Q;
 
             % Correction
             obj.h_x_pred = obj.h(obj.x_pred);
-            HJ = JacobianH(obj, obj.h, obj.x_pred);
+            HJ = obj.JacobianH(obj.h, obj.x_pred);
 
             % Kalman Gain
             obj.Kg = obj.P_pred * HJ' / (HJ * obj.P_pred * HJ' + obj.R_cov);
 
             % Estimation
-            obj.x_est = obj.x_pred + ( obj.Kg * (obj.y - obj.h_x_pred));
+            % obj.x_est = obj.x_pred + ( obj.Kg * (obj.y - obj.h_x_pred));
+            obj.x_est = obj.x_pred + ( obj.Kg * [obj.sigma_acc.*ones(3,1); obj.sigma_gyro.*ones(3,1)]);
 
-            obj.P_est = (eye(12,12) - obj.Kg * HJ) * obj.P_pred;
+
+            obj.P_est = (eye(12) - obj.Kg * HJ) * obj.P_pred;
         end
 
         function J = JacobianA(obj, f, x)
-            dX = 0.01;
+            dX = 1e-2;
             J = zeros(12, 12);
-            j = f(x, obj.u);
 
-            % Row
-            for i = 1:12
-                % Column
-                for k = 1:12
-
+            for i = 1:12 % Row (derive with respect to the i-th component)
+                for k = 1:12  % Column
                     xEst1 = x;
-
+                    xEst2 = x;
                     xEst1(k) = x(k) + dX;
+                    xEst2(k) = x(k) - dX;
 
                     j1 = f(xEst1, obj.u);
+                    j2 = f(xEst2, obj.u);
 
-                    J(k, i) = (j1(k) - j(k)) / dX;
+                    J(i, k) = (j1(i) - j2(i)) / (2 * dX);
                 end
             end
         end
+
 
         function J = JacobianH(obj, f, x)
-            dX = 0.01;
-            J = zeros(6, 6);
-            j = f(x);
+            dX = 1e-2;
+            J = zeros(6, 12);  % 6 osservazioni, 12 variabili di stato
 
-            % Row
-            for i = 1:12
-                % Column
-                for k = 1:6
-
+            for i = 1:6 % Row (derive with respect to the i-th observation)
+                for k = 1:12  % Column
                     xEst1 = x;
-
+                    xEst2 = x;
                     xEst1(k) = x(k) + dX;
+                    xEst2(k) = x(k) - dX;
 
                     j1 = f(xEst1);
+                    j2 = f(xEst2);
 
-                    J(k, i) = (j1(k) - j(k)) / dX;
+                    J(i, k) = (j1(i) - j2(i)) / (2 * dX);
                 end
             end
         end
-       
-
 
         %% Controllers
 
@@ -927,7 +975,8 @@ classdef Drone < handle
         %% Logger
         function logger(obj)
             progress = 100 - (100 * (abs(obj.t(end) - obj.tf))/obj.tf);
-            fprintf('Progress:\t %f [perc] |\t', progress);
+            % fprintf('Progress:\t %f [perc] |\t', progress);
+            fprintf('Time:\t %f [s] |\t', obj.t(end));
             fprintf('Inputs:\t [%f, %f, %f, %f] |\t', obj.u);
             % fprintf('Thrust:\t %f [N] |\t', obj.Fz);
             % fprintf('R: \t %f\t|\t', obj.R);

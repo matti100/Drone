@@ -19,7 +19,7 @@ while (gen <= maxGen && err >= tol)
 
     % New popolation
     new_pop = zeros(pop_size, 6);
-    for i = 1:pop_size
+    parfor i = 1:pop_size
         % Selection
         parent1 = roulette_selection(pop, fitness);
         parent2 = roulette_selection(pop, fitness);

@@ -70,16 +70,22 @@ parfor j = 1:length(Drone.tvec)-1
 end
 
 % Mean Square Error computation (MSE)
-err_x = Drone.err_x(~isnan(Drone.err_x) & ~isinf(Drone.err_x));
-err_y = Drone.err_y(~isnan(Drone.err_y) & ~isinf(Drone.err_y));
-err_z = Drone.err_z(~isnan(Drone.err_z) & ~isinf(Drone.err_z));
-err_phi = Drone.err_phi(~isnan(Drone.err_phi) & ~isinf(Drone.err_phi));
-err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
-err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
+% err_x = Drone.err_x(~isnan(Drone.err_x) & ~isinf(Drone.err_x));
+% err_y = Drone.err_y(~isnan(Drone.err_y) & ~isinf(Drone.err_y));
+% err_z = Drone.err_z(~isnan(Drone.err_z) & ~isinf(Drone.err_z));
+% err_phi = Drone.err_phi(~isnan(Drone.err_phi) & ~isinf(Drone.err_phi));
+% err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
+% err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
 
-error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
-error = error.^2;
-MSE = mean(error);
+% error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
+% error = [err_x; err_y; err_z];
+error = (Drone.Err_x).^2 + (Drone.Err_y).^2 + (Drone.Err_z).^2;
+error(isinf(error)) = 1e10; % Sostituisce inf con 1000
+error(isnan(error)) = eps * 1e2;    % Sostituisce NaN con 0
+% error = error.*Drone.t(1:1/Drone.sampleTime:end-1);
+% MSE = mean(error);
+ISE = trapz(error);
+% ITSE = trapz(error.*Drone.t);
 
 % % Lyapunov Function derivative
 % dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
@@ -89,8 +95,9 @@ MSE = mean(error);
 
 % Fitness function computation
 % fitness = MSE + V_dot;
-fitness = MSE;
-% fitness = ISE;
+% fitness = MSE;
+fitness = ISE;
+% fitness = ITSE;
 end
 
 % Select random parent from population

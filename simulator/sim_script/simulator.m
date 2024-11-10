@@ -41,7 +41,7 @@ params.k_m = 1.78*1e-6 / 9.54929658;
 params.g = 9.81;        % [m/s^2]            % Gravity acceleration
 
 % Time interval
-params.dt = 0.01;       % [s]                % Time interval
+params.dt = 0.005;       % [s]                % Time interval
 
 % Initial Condition
 x0 = zeros(12,1);
@@ -59,7 +59,7 @@ desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
-tmax = 10;              % [s]
+tmax = 5;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
@@ -69,6 +69,14 @@ control = 0;           % 0 -> PID + non-linear dynamics
                        % 2 -> LQR + non-linear dynamics
                        % -1 -> PID + linear dynamics
                        % 3 -> mpc
+
+% Estimator Flag
+estimation = 0;        % 0 -> no estimation
+                       % 1 -> kalman filter
+
+% Discrete Time
+sampleTime = 0.01;      % [s] sample time for the discrete system
+                             % sampleTime = params.dt -> continous time
 
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
@@ -113,15 +121,15 @@ elseif (tuner_flag == 2)
     
     pop_size = 100;
     maxGen = 2000;
-    tol = 0.5;
+    tol = 450;
     mutation_rate = 0.6;
     kMax = 1;
 
     k0 = zeros(6,3);
     gains = gainBuilder(k0(:, 1), k0(:, 2), k0(:, 3));
-    myDrone = Drone(params, x0, desideredState, gains, tspan, -1);
+    myDrone = Drone(params, x0, desideredState, gains, tspan, 0, estimation, sampleTime);
 
-    tunedGains = ga_tuner2(myDrone, pop_size, maxGen, mutation_rate, kMax, tol);
+    tunedGains = ga_tuner(myDrone, pop_size, maxGen, mutation_rate, kMax, tol);
 
     save('tunedGains_ga', "tunedGains");
 
@@ -151,13 +159,35 @@ else
           0.66;         % -> kD_R                  0.66                   0.76
           0.66;         % -> kD_P                  0.66                   0.76
           0.9];       % -> kD_Y                  0.066                x 0.01
+
+    %     % Manual tuning                             % I set                 II set
+    % kP = [60;           % -> kP_T                  40                     20
+    %       -0.4;            % -> kP_phi                0
+    %       0;          % -> kP_theta              0.4
+    %       1;            % -> kP_R                  1                      1.55
+    %       0;            % -> kP_P                  1                      1.55
+    %       0];         % -> kP_Y                  0.1                  x 0.02
+    % 
+    % kI = [30;           % -> kI_T                  30                     10
+    %       -0.09;            % -> kI_phi                0
+    %       0;         % -> kI_theta              0.09
+    %       0.13;         % -> kI_R                  0.13                   0.17
+    %       0;         % -> KI_P                  0.13                   0.17
+    %       0];       % -> KI_Y                  0.013                x 0.01
+    % 
+    % kD = [2;           % -> kD_T                  0.2                     10
+    %       0;         % -> kD_phi                0
+    %       0;         % -> kD_theta              0.25
+    %       0;         % -> kD_R                  0.66                   0.76
+    %       0;         % -> kD_P                  0.66                   0.76
+    %       0];       % -> kD_Y                  0.066                x 0.01
     
     % load("tunedGains_ga.mat");
     % gains = tunedGains;
     gains = gainBuilder(kP, kI, kD);
 
     % Initialize Drone
-    myDrone = Drone(params, x0, desideredState, gains, tspan, control);
+    myDrone = Drone(params, x0, desideredState, gains, tspan, control, estimation, sampleTime);
     % myDrone.linearizeHovering();
 
     % Simulation
@@ -184,31 +214,40 @@ if (plot_flag)
 
     figure(1);
 
-    subplot(2,2,1)
+    subplot(2,1,1)
     plot(tvec, traj);
+    hold on;
+    plot(tvec, desideredState.rDes.*ones(size(tvec)), 'k--');
     legend('x(t)', 'y(t)', 'z(t)');
     xlabel('Time [s]');
     ylabel('Trajectory [m]');
     title('Trajectory of the drone');
     ylim([-2, 6])
     
-    subplot(2,2,2)
-    plot(tvec, myDrone.V);
-    hold on;
-    plot(tvec, myDrone.dV);
-    plot(tvec, zeros(size(tvec)), '-.r');
-    xlabel('Time [s]');
-    ylabel('Lyapunov function');
-    legend('V(t)', 'dV(t)', '0 line');
-    title('Lyapunov Function');
-    
-    subplot(2,2,3)
+    subplot(2,1,2)
     plot(tvec, ang);
     xlabel('Time [s]');
     ylabel('attitude [rad]');
     legend('phi', 'theta', 'psi');
     title('Attitude of the drone');
     % ylim([-0.3, 0.3]);
+
+    % figure();
+    % plot(tvec, myDrone.V);
+    % hold on;
+    % plot(tvec, myDrone.dV);
+    % plot(tvec, zeros(size(tvec)), '-.r');
+    % xlabel('Time [s]');
+    % ylabel('Lyapunov function');
+    % legend('V(t)', 'dV(t)', '0 line');
+    % title('Lyapunov Function');
+
+    figure(2);
+    plot(tvec, myDrone.U);
+    xlabel('Time [s]');
+    ylabel('Control');
+    legend('u1', 'u2', 'u3', 'u4');
+    title('Control inputs');
 
     if (anim_flag)
 
