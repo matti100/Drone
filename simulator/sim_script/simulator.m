@@ -47,7 +47,7 @@ params.dt = 0.005;       % [s]                % Time interval
 x0 = zeros(12,1);
 x0(1) = 0;
 x0(2) = 0;
-x0(3) = 1;
+x0(3) = 0;
 x0(7) = 0;
 x0(8) = 0;
 x0(9) = 0;
@@ -59,7 +59,7 @@ desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
-tmax = 5;              % [s]
+tmax = 15;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
@@ -71,7 +71,7 @@ control = 0;           % 0 -> PID + non-linear dynamics
                        % 3 -> mpc
 
 % Estimator Flag
-estimation = 0;        % 0 -> no estimation
+estimation = 1;        % 0 -> no estimation
                        % 1 -> kalman filter
 
 % Discrete Time
@@ -188,7 +188,6 @@ else
 
     % Initialize Drone
     myDrone = Drone(params, x0, desideredState, gains, tspan, control, estimation, sampleTime);
-    % myDrone.linearizeHovering();
 
     % Simulation
     t = 0;
@@ -207,11 +206,22 @@ end
 %% Plot
 if (plot_flag)
     close all
+
+    % Variables definition
     traj = myDrone.traj(:, 1:3);
     vel = myDrone.traj(:, 4:6);
     ang = myDrone.traj(:, 7:9);
     w = myDrone.traj(:, 10:12);
 
+    cmd = myDrone.U;
+
+    traj_est = myDrone.traj_est(:, 1:3);
+    vel_est = myDrone.traj_est(:, 4:6);
+    ang_est = myDrone.traj_est(:, 7:9);
+    w_est = myDrone.traj_est(:, 10:12);
+
+    % Plots
+    % State
     figure(1);
 
     subplot(2,1,1)
@@ -232,7 +242,26 @@ if (plot_flag)
     title('Attitude of the drone');
     % ylim([-0.3, 0.3]);
 
-    % figure();
+    % Commands
+    figure(2);
+    stairs(tvec, cmd);
+    xlabel('Time [s]');
+    ylabel('Control');
+    legend('u1', 'u2', 'u3', 'u4');
+    title('Control inputs');
+
+    % State Estimation
+    figure(3);
+    stairs(tvec, traj_est);
+    hold on;
+    plot(tvec, desideredState.rDes.*ones(size(tvec)), 'k--');
+    xlabel('Time [s]');
+    ylabel('Trajectory [m]');
+    legend('x_est', 'y_est', 'z_est');
+    title('Trajectory Estimation');
+
+    % % Lyapunov Function
+    % figure(4);
     % plot(tvec, myDrone.V);
     % hold on;
     % plot(tvec, myDrone.dV);
@@ -242,13 +271,7 @@ if (plot_flag)
     % legend('V(t)', 'dV(t)', '0 line');
     % title('Lyapunov Function');
 
-    figure(2);
-    plot(tvec, myDrone.U);
-    xlabel('Time [s]');
-    ylabel('Control');
-    legend('u1', 'u2', 'u3', 'u4');
-    title('Control inputs');
-
+    % Animation
     if (anim_flag)
 
     drone_dimensions = struct();

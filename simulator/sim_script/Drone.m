@@ -38,6 +38,7 @@ classdef Drone < handle
         att             % [phi, theta, psi]
         w               % [dphi, dtheta, dpsi]
         dx
+        x_old;
 
         u               % [4x1] Inputs
         u_old
@@ -228,6 +229,7 @@ classdef Drone < handle
             obj.att = obj.att0;
             obj.w = obj.w0;
             obj.dx = zeros(12,1);
+            obj.x_old = obj.x;
 
             obj.u = zeros(4,1);
             obj.u_old = obj.u;
@@ -320,14 +322,6 @@ classdef Drone < handle
             obj.traj_est = obj.x_est';
 
             obj.P_est = eye(12);
-
-            % obj.h = @(x) [(x(4) - obj.traj(end, 4))./obj.dt;
-            %     (x(5) - obj.traj(end, 5))./obj.dt;
-            %     (x(6) - obj.traj(end, 6))./obj.dt;
-            %     x(10);
-            %     x(11);
-            %     x(12)
-            %     ];
 
             obj.h = @(x) [obj.rotMat(x)' * (obj.dx(4:6) + [0;0;-obj.g]);
                 x(10);
@@ -438,10 +432,15 @@ classdef Drone < handle
 
             % Integrate system of odes
             % Explicit Euler integration method
-            % obj.dx = obj.func(obj.x, obj.u);
-            % obj.x = obj.x + ( obj.dx .* obj.dt );
             obj.dx = obj.func(state, cmd);
             obj.x = state + ( obj.dx .* obj.dt );
+
+            % % Runge-Kutta 4
+            % obj.x = obj.rk4(obj.func, state, cmd, obj.dt);
+
+            % % ODE45
+            % [~, y] = ode45(@(t, x) obj.func(x, cmd), [obj.t(end), obj.t(end) + obj.dt], state);
+            % obj.x = y(end, :)';
 
             % Update external force, torque 
             obj.F = obj.Force(cmd);
@@ -460,25 +459,20 @@ classdef Drone < handle
 
             % Update time 
             obj.t = [obj.t; obj.t(end) + obj.dt];
-            
-            % % Update motor commands
-            % if abs(mod(obj.t(end), obj.sampleTime)) < eps * 1000
-            %     obj.motorCMD();
-            % end
 
-            % Incrementa un contatore e aggiorna quando raggiunge il numero necessario
+            % SampleTime counter
             obj.counter = obj.counter + 1;
+
+            % Motor commands
             if obj.counter >= 1/(obj.dt/obj.sampleTime)
                 obj.u_old = obj.u;
                 obj.motorCMD();
-                obj.counter = 0; % Reset del contatore
             end
 
-            % obj.motorCMD();
             obj.U = [obj.U; obj.u'];
             
             % Integrate system of odes.
-            obj.integrateSystem(obj.x, obj.u);
+            obj.integrateSystem(obj.x_old, obj.u);
 
             % Update each state
             obj.r = obj.x(1:3);
@@ -490,11 +484,14 @@ classdef Drone < handle
             obj.traj = [obj.traj; obj.x'];
             
             % State estimation
-            if (obj.estimation)
-                if (mod(length(obj.t), 1/obj.sampleTime) == 0)
+            if(obj.estimation)
+                if obj.counter >= 1/(obj.dt/obj.sampleTime)
                     obj.Estimator();
                 end
+                obj.x_old = obj.x;
+                obj.x = obj.x_est;
             end
+            obj.traj_est = [obj.traj_est; obj.x_est'];
 
             % Update Lyapunov function
             [V, dV] = lyapunov(obj, obj.V(end));
@@ -519,6 +516,11 @@ classdef Drone < handle
             obj.Err_phi = [obj.Err_phi, obj.err_phi];
             obj.Err_theta = [obj.Err_theta, obj.err_theta];
             obj.Err_psi = [obj.Err_psi, obj.err_psi];
+
+            % Reset sampleTime counter
+            if obj.counter >= 1/(obj.dt/obj.sampleTime)
+                obj.counter = 0;
+            end
 
         end
 
@@ -610,14 +612,13 @@ classdef Drone < handle
             obj.dr_est = obj.x_est(4:6);
             obj.att_est = obj.x_est(7:9);
             obj.w_est = obj.x_est(10:12);
-            obj.traj_est = [obj.traj_est; obj.x_est'];
+            % obj.traj_est = [obj.traj_est; obj.x_est'];
         end
 
         % Kalman filter
         function obj = KalmanFilter(obj) 
 
             % Prediction
-            % obj.x_pred = obj.func(obj.x_est, obj.u);
             obj.x_pred = obj.x;
 
             AJ = obj.JacobianA(obj.func, obj.x_est);
@@ -632,9 +633,7 @@ classdef Drone < handle
             obj.Kg = obj.P_pred * HJ' / (HJ * obj.P_pred * HJ' + obj.R_cov);
 
             % Estimation
-            % obj.x_est = obj.x_pred + ( obj.Kg * (obj.y - obj.h_x_pred));
-            obj.x_est = obj.x_pred + ( obj.Kg * [obj.sigma_acc.*ones(3,1); obj.sigma_gyro.*ones(3,1)]);
-
+            obj.x_est = obj.x_pred + ( obj.Kg * (obj.y - obj.h_x_pred));
 
             obj.P_est = (eye(12) - obj.Kg * HJ) * obj.P_pred;
         end
@@ -952,6 +951,17 @@ classdef Drone < handle
             d = (err - err_prev)/obj.dt;
         end
 
+        %% Runge-Kutta 4
+        function y = rk4(~, func, x, u, h)
+            
+            k1 = func(x, u);
+            k2 = func(x + h*k1/2, u);
+            k3 = func(x + h*k2/2, u);
+            k4 = func(x + h*k3, u);
+
+            y = x + h * (k1 + 2*k2 + 2*k3 + k4) / 6;
+        end
+
         %% Simpson integration
         function s = simpson(obj, err, err_prev, err_prevprev)
             s = (err_prevprev + 4*err_prev + err)*obj.dt/3;
@@ -974,7 +984,7 @@ classdef Drone < handle
         end
         %% Logger
         function logger(obj)
-            progress = 100 - (100 * (abs(obj.t(end) - obj.tf))/obj.tf);
+            % progress = 100 - (100 * (abs(obj.t(end) - obj.tf))/obj.tf);
             % fprintf('Progress:\t %f [perc] |\t', progress);
             fprintf('Time:\t %f [s] |\t', obj.t(end));
             fprintf('Inputs:\t [%f, %f, %f, %f] |\t', obj.u);
