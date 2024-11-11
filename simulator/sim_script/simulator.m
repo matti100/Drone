@@ -232,7 +232,7 @@ if (plot_flag)
     xlabel('Time [s]');
     ylabel('Trajectory [m]');
     title('Trajectory of the drone');
-    ylim([-2, 6])
+    % ylim([-2, 6])
     
     subplot(2,1,2)
     plot(tvec, ang);

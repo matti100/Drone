@@ -68,15 +68,28 @@ classdef Drone < handle
 
         % Errors
         error;
-        err_x; err_x_prev; err_x_prevprev; Serr_x; Derr_x;
-        err_y; err_y_prev; err_y_prevprev; Serr_y; Derr_y;
-        err_z; err_z_prev; err_z_prevprev; Serr_z; Derr_z;
-
-        err_phi; err_phi_prev; err_phi_prevprev; Serr_phi; Derr_phi;
-        err_theta; err_theta_prev; err_theta_prevprev; Serr_theta; Derr_theta;
-        err_psi; err_psi_prev; err_psi_prevprev; Serr_psi; Derr_psi;
+        err_x; err_y; err_z; err_phi; err_theta; err_psi;
 
         Err_x; Err_y; Err_z; Err_phi; Err_theta; Err_psi;
+
+        err_x_prev; err_x_prevprev;
+        err_y_prev; err_y_prevprev;
+        err_z_prev; err_z_prevprev;
+        err_phi_prev; err_phi_prevprev;
+        err_theta_prev; err_theta_prevprev;
+        err_psi_prev; err_psi_prevprev;
+
+        Serr_x; Derr_x;
+        Serr_y; Derr_y;
+        Serr_z; Derr_z;
+        Serr_phi; Derr_phi;
+        Serr_theta; Derr_theta;
+        Serr_psi; Derr_psi;
+
+        error_est;
+        err_x_est; err_y_est; err_z_est; err_phi_est; err_theta_est; err_psi_est;
+
+        Err_x_est; Err_y_est; Err_z_est; Err_phi_est; Err_theta_est; Err_psi_est;
 
         %% PID gains
         % Position controller
@@ -162,7 +175,8 @@ classdef Drone < handle
 
         x_pred;
         P_pred;
-        h_x_pred;
+       
+        y_pred;
 
         x_est;
         r_est;
@@ -310,8 +324,8 @@ classdef Drone < handle
             % Navigation
             obj.estimation = estimation;
 
-            obj.sigma_acc = 2e-3;
-            obj.sigma_gyro = 1e-3;
+            obj.sigma_gyro = 0.005 * sqrt(1/obj.sampleTime) * pi/180;
+            obj.sigma_acc = 400*(1e-6) * sqrt(1/obj.sampleTime) / obj.g;
 
             obj.x_est = obj.x;
             obj.r_est = obj.x_est(1:3);
@@ -321,21 +335,35 @@ classdef Drone < handle
             
             obj.traj_est = obj.x_est';
 
-            obj.P_est = eye(12);
+            obj.error_est = obj.xDes - obj.x_est;
 
-            % obj.h = @(x) [obj.rotMat(x)' * (obj.dx(4:6) + [0;0;-obj.g]);
+            obj.err_x_est = obj.error_est(1);
+            obj.err_y_est = obj.error_est(2);
+            obj.err_z_est = obj.error_est(3);
+            obj.err_phi_est = obj.error_est(7);
+            obj.err_theta_est = obj.error_est(8);
+            obj.err_psi_est = obj.error_est(9);
+
+            obj.Err_x_est = obj.err_x_est;
+            obj.Err_y_est = obj.err_y_est;
+            obj.Err_z_est = obj.err_z_est;
+            obj.Err_phi_est = obj.err_phi_est;
+            obj.Err_theta_est = obj.err_theta_est;
+            obj.Err_psi_est = obj.err_psi_est;
+
+            % obj.h = @(x, u) [obj.rotMat(x)' * ((1/obj.m).*obj.rotMat(x)*[0; 0; u(1)] + [0;0;-obj.g]);
             %     x(10);
             %     x(11);
             %     x(12)
             %     ];
 
-            obj.h = @(x, u) [obj.rotMat(x)' * ((1/obj.m).*obj.rotMat(x)*[0; 0; u(1)] + [0;0;-obj.g]);
-                x(10);
-                x(11);
-                x(12)
+            obj.h = @(x, u) [
+                (1/obj.m).*[0; 0; u(1)] + obj.rotMat(x)'*[0;0;-obj.g];
+                x(10:12);
                 ];
 
-            obj.Q = eye(12).*1e-0;
+            obj.P_est = 0.*eye(12);
+            obj.Q = 0.*eye(12).*1e-0;
             obj.R_cov = diag([(obj.sigma_acc^2).*ones(3,1); ...
                               (obj.sigma_gyro^2).*ones(3,1)]);
 
@@ -476,9 +504,25 @@ classdef Drone < handle
                 % State Estimation
                 if (obj.estimation)
                     obj.Estimator();
-                    obj.x_old = obj.x;
-                    obj.x = obj.x_est;
+                else
+                    obj.x_est = obj.x;
                 end
+
+                % Error estimation
+                obj.error_est = obj.xDes - obj.x_est;
+                obj.err_x_est = obj.error_est(1);
+                obj.err_y_est = obj.error_est(2);
+                obj.err_z_est = obj.error_est(3);
+                obj.err_phi_est = obj.error_est(7);
+                obj.err_theta_est = obj.error_est(8);
+                obj.err_psi_est = obj.error_est(9);
+
+                obj.Err_x_est = [obj.Err_x_est, obj.err_x_est];
+                obj.Err_y_est = [obj.Err_y_est, obj.err_y_est];
+                obj.Err_z_est = [obj.Err_z_est, obj.err_z_est];
+                obj.Err_phi_est = [obj.Err_phi_est, obj.err_phi_est];
+                obj.Err_theta_est = [obj.Err_theta_est, obj.err_theta_est];
+                obj.Err_psi_est = [obj.Err_psi_est, obj.err_psi_est];
 
                 % Motor Commands
                 obj.u_old = obj.u;
@@ -488,10 +532,10 @@ classdef Drone < handle
             end
             obj.traj_est = [obj.traj_est; obj.x_est'];
             obj.U = [obj.U; obj.u'];
-            
 
+            
             % Integrate system of odes.
-            obj.integrateSystem(obj.x_old, obj.u);
+            obj.integrateSystem(obj.x, obj.u);
 
             % Update each state
             obj.r = obj.x(1:3);
@@ -501,16 +545,6 @@ classdef Drone < handle
 
             % Update trajectory
             obj.traj = [obj.traj; obj.x'];
-            
-            % % State estimation
-            % if(obj.estimation)
-            %     if obj.counter >= 1/(obj.dt/obj.sampleTime)
-            %         obj.Estimator();
-            %     end
-            %     obj.x_old = obj.x;
-            %     obj.x = obj.x_est;
-            % end
-            % obj.traj_est = [obj.traj_est; obj.x_est'];
 
             % Update Lyapunov function
             [V, dV] = lyapunov(obj, obj.V(end));
@@ -519,15 +553,13 @@ classdef Drone < handle
             obj.dV = [obj.dV, dV];
             
             % Update Error
-            if (obj.control == 3)
-                obj.error = obj.xDes - obj.x;
-                obj.err_x = obj.error(1);
-                obj.err_y = obj.error(2);
-                obj.err_z = obj.error(3);
-                obj.err_phi = obj.error(7);
-                obj.err_theta = obj.error(8);
-                obj.err_psi = obj.error(9);
-            end
+            obj.error = obj.xDes - obj.x;
+            obj.err_x = obj.error(1);
+            obj.err_y = obj.error(2);
+            obj.err_z = obj.error(3);
+            obj.err_phi = obj.error(7);
+            obj.err_theta = obj.error(8);
+            obj.err_psi = obj.error(9);
 
             obj.Err_x = [obj.Err_x, obj.err_x];
             obj.Err_y = [obj.Err_y, obj.err_y];
@@ -535,11 +567,6 @@ classdef Drone < handle
             obj.Err_phi = [obj.Err_phi, obj.err_phi];
             obj.Err_theta = [obj.Err_theta, obj.err_theta];
             obj.Err_psi = [obj.Err_psi, obj.err_psi];
-
-            % % Reset sampleTime counter
-            % if obj.counter >= 1/(obj.dt/obj.sampleTime)
-            %     obj.counter = 0;
-            % end
 
         end
 
@@ -641,6 +668,7 @@ classdef Drone < handle
             % obj.x_pred = obj.x;
             % obj.x_pred = obj.x_est;
             obj.x_pred = obj.x_est + obj.func(obj.x_est, obj.u).*obj.sampleTime;
+            % obj.x_pred = obj.func(obj.x_est, obj.u);
 
             % AJ = obj.JacobianA(obj.func, obj.x_est);
             AJ = obj.JacobianA(obj.func, obj.x_pred);
@@ -648,20 +676,20 @@ classdef Drone < handle
             obj.P_pred = AJ * obj.P_est * AJ' + obj.Q;
 
             % Correction
-            obj.h_x_pred = obj.h(obj.x_pred, obj.u);
+            obj.y_pred = obj.h(obj.x_pred, obj.u);
             HJ = obj.JacobianH(obj.h, obj.x_pred);
 
             % Kalman Gain
             obj.Kg = obj.P_pred * HJ' / (HJ * obj.P_pred * HJ' + obj.R_cov);
 
             % Estimation
-            obj.x_est = obj.x_pred + ( obj.Kg * (obj.y - obj.h_x_pred));
+            obj.x_est = obj.x_pred + ( obj.Kg * (obj.y - obj.y_pred));
 
             obj.P_est = (eye(12) - obj.Kg * HJ) * obj.P_pred;
         end
 
         function J = JacobianA(obj, f, x)
-            dX = 1e-2;
+            dX = 1e-3;
             J = zeros(12, 12);
 
             for i = 1:12 % Row (derive with respect to the i-th component)
@@ -681,7 +709,7 @@ classdef Drone < handle
 
 
         function J = JacobianH(obj, f, x)
-            dX = 1e-2;
+            dX = 1e-3;
             J = zeros(6, 12);  % 6 osservazioni, 12 variabili di stato
 
             for i = 1:6 % Row (derive with respect to the i-th observation)
@@ -812,52 +840,47 @@ classdef Drone < handle
         % Altitude controller
         function T = altitudeCtrl(obj)
             % Error computation
-            if (length(obj.t) > 1)          % err_z_prevprev available
-                obj.err_z_prevprev = obj.err_z_prev;
-                obj.err_z_prev = obj.err_z;
-                obj.err_z = obj.rDes(3) - obj.x(3); % z_des - z
-                
-                obj.Serr_z = obj.Serr_z + ...
-                               obj.simpson(obj.err_z, obj.err_z_prev, obj.err_z_prevprev);
-            else    
-                obj.err_z_prev = obj.err_z;
-                obj.err_z = obj.rDes(3) - obj.x(3); % z_des - z
+            obj.err_z_prev = obj.Err_z_est(end-1);
 
+            % Integral term computation
+            if (min(size(obj.Err_z_est)) > 1)
+                obj.err_z_prevprev = obj.Err_z_est(end-2);
                 obj.Serr_z = obj.Serr_z + ...
-                             obj.trap(obj.err_z, obj.err_z_prev);
+                    obj.simpson(obj.err_z, obj.err_z_prev, obj.err_z_prevprev);
+            else
+                obj.Serr_z = obj.Serr_z + ...
+                                   obj.trap(obj.err_z, obj.err_z_prev);
             end
 
+            % Derivative term computation
             obj.Derr_z = obj.bkwFD(obj.err_z, obj.err_z_prev);
             
             % PID controller
-            % T = sqrt((obj.m*obj.g)/(4*obj.k_f)); % minimum required to balance weight
-            T = (obj.kP_T * obj.err_z + ...
+            T = (obj.kP_T * obj.err_z_est + ...
                      obj.kI_T * obj.Serr_z + ...
                      obj.kD_T * obj.Derr_z);
         end
         
         % Phi desidered controller
         function phi_des = phiCtrl(obj)
-            if (length(obj.t) > 1)      % err_y_prevprev available  
-                % Error computation
-                obj.err_y_prevprev = obj.err_y_prev;
-                obj.err_y_prev = obj.err_y;
-                obj.err_y = obj.rDes(2) - obj.x(2); % y_des - y
+            % Error computation
+            obj.err_y_prev = obj.Err_y_est(end-1);
 
+            % Integral term computation
+            if (min(size(obj.Err_y_est)) > 1)
+                obj.err_y_prevprev = obj.Err_y_est(end-2);
                 obj.Serr_y = obj.Serr_y + ...
-                               obj.simpson(obj.err_y, obj.err_y_prev, obj.err_y_prevprev);
+                    obj.simpson(obj.err_y, obj.err_y_prev, obj.err_y_prevprev);
             else
-                obj.err_y_prev = obj.err_y;
-                obj.err_y = obj.rDes(2) - obj.x(2); 
-
                 obj.Serr_y = obj.Serr_y + ...
-                             obj.trap(obj.err_y, obj.err_y_prev);
+                                   obj.trap(obj.err_y, obj.err_y_prev);
             end
-
+            
+            % Derivative term computation
             obj.Derr_y = obj.bkwFD(obj.err_y, obj.err_y_prev);
 
             % PID controller
-            phi_des = obj.kP_phi * obj.err_y + ...
+            phi_des = obj.kP_phi * obj.err_y_est + ...
                       obj.kI_phi * obj.Serr_y + ...
                       obj.kD_phi * obj.Derr_y;
         end
@@ -865,25 +888,23 @@ classdef Drone < handle
         % Theta desidered controller
         function theta_des = thetaCtrl(obj)
             % Error computation
-            if (length(obj.t) > 1)       % err_x_prevprev available
-                obj.err_x_prevprev = obj.err_x_prev;
-                obj.err_x_prev = obj.err_x;
-                obj.err_x = obj.rDes(1) - obj.x(1); % x_des - x
+            obj.err_x_prev = obj.Err_x_est(end-1);
 
+            % Integral term computation
+            if (min(size(obj.Err_x_est)) > 1)
+                obj.err_x_prevprev = obj.Err_x_est(end-2);
                 obj.Serr_x = obj.Serr_x + ...
-                               obj.simpson(obj.err_x, obj.err_x_prev, obj.err_x_prevprev);
+                    obj.simpson(obj.err_x, obj.err_x_prev, obj.err_x_prevprev);
             else
-                obj.err_x_prev = obj.err_x;
-                obj.err_x = obj.rDes(1) - obj.x(1); % x_des - x
-
                 obj.Serr_x = obj.Serr_x + ...
-                               obj.trap(obj.err_x, obj.err_x_prev);
+                                   obj.trap(obj.err_x, obj.err_x_prev);
             end
-
+            
+            % Derivative term computation
             obj.Derr_x = obj.bkwFD(obj.err_x, obj.err_x_prev);
 
             % PID controller
-            theta_des = obj.kP_theta * obj.err_x + ...
+            theta_des = obj.kP_theta * obj.err_x_est + ...
                         obj.kI_theta * obj.Serr_x + ...
                         obj.kD_theta * obj.Derr_x;
         end
@@ -892,25 +913,23 @@ classdef Drone < handle
         % Control Y position
         function R = RCtrl(obj) % U2
             % Error computation
-            if (length(obj.t) > 1)      % err_phi_prevprev available
-                obj.err_phi_prevprev = obj.err_phi_prev;
-                obj.err_phi_prev = obj.err_phi;
-                obj.err_phi = obj.attDes(1) - obj.att(1); % phi_des - phi
+            obj.err_phi_prev = obj.Err_phi_est(end-1);
 
+            % Integral term computation
+            if (min(size(obj.Err_phi_est)) > 1)
+                obj.err_phi_prevprev = obj.Err_phi_est(end-2);
                 obj.Serr_phi = obj.Serr_phi + ...
-                               obj.simpson(obj.err_phi, obj.err_phi_prev, obj.err_phi_prevprev);
+                    obj.simpson(obj.err_phi, obj.err_phi_prev, obj.err_phi_prevprev);
             else
-                obj.err_phi_prev = obj.err_phi;
-                obj.err_phi = obj.attDes(1) - obj.att(1); % phi_des - phi;
-
                 obj.Serr_phi = obj.Serr_phi + ...
-                               obj.trap(obj.err_phi, obj.err_phi_prev);
+                                   obj.trap(obj.err_phi, obj.err_phi_prev);
             end
 
+            % Derivative term computation
             obj.Derr_phi = obj.bkwFD(obj.err_phi, obj.err_phi_prev);
 
             % PID controller
-            R = obj.kP_R * obj.err_phi + ...
+            R = obj.kP_R * obj.err_phi_est + ...
                 obj.kI_R * obj.Serr_phi + ...
                 obj.kD_R * obj.Derr_phi;
         end
@@ -919,25 +938,23 @@ classdef Drone < handle
         % Control X position
         function P = PCtrl(obj)
             % Error computation
-            if (length(obj.t) > 1)      % err_theta_prevprev available
-                obj.err_theta_prevprev = obj.err_theta_prev;
-                obj.err_theta_prev = obj.err_theta;
-                obj.err_theta = obj.attDes(2) - obj.att(2); % theta_des - theta
+            obj.err_theta_prev = obj.Err_theta_est(end-1);
 
+            % Integral term computation
+            if (min(size(obj.Err_theta_est)) > 1)
+                obj.err_theta_prevprev = obj.Err_theta_est(end-2);
                 obj.Serr_theta = obj.Serr_theta + ...
-                               obj.simpson(obj.err_theta, obj.err_theta_prev, obj.err_theta_prevprev);
+                    obj.simpson(obj.err_theta, obj.err_theta_prev, obj.err_theta_prevprev);
             else
-                obj.err_theta_prev = obj.err_theta;
-                obj.err_theta = obj.attDes(2) - obj.att(2); % theta_des - theta
-
                 obj.Serr_theta = obj.Serr_theta + ...
-                               obj.trap(obj.err_theta, obj.err_theta_prev);
+                                   obj.trap(obj.err_theta, obj.err_theta_prev);
             end
 
+            % Derivative term computation
             obj.Derr_theta = obj.bkwFD(obj.err_theta, obj.err_theta_prev);
 
             % PID controller
-            P = obj.kP_P * obj.err_theta + ...
+            P = obj.kP_P * obj.err_theta_est + ...
                 obj.kI_P * obj.Serr_theta + ...
                 obj.kD_P * obj.Derr_theta;
         end
@@ -945,25 +962,23 @@ classdef Drone < handle
         % Yaw controller
         function Y = YCtrl(obj)
             % Error computation
-            if (length(obj.t) > 1)      % err_psi_prevprev available
-                obj.err_psi_prevprev = obj.err_psi_prev;
-                obj.err_psi_prev = obj.err_psi;
-                obj.err_psi = obj.attDes(3) - obj.att(3); % phi - phi_des
-                
+            obj.err_psi_prev = obj.Err_psi_est(end-1);
+            
+            % Integral term computation
+            if (min(size(obj.Err_psi_est)) > 1)
+                obj.err_psi_prevprev = obj.Err_psi_est(end-2);
                 obj.Serr_psi = obj.Serr_psi + ...
                                obj.simpson(obj.err_psi, obj.err_psi_prev, obj.err_psi_prevprev);
-            else
-                obj.err_psi_prev = obj.err_psi;
-                obj.err_psi = obj.attDes(3) - obj.att(3); % phi_des - phi
-
+            else 
                 obj.Serr_psi = obj.Serr_psi + ...
-                               obj.trap(obj.err_psi, obj.err_psi_prev);
+                    obj.trap(obj.err_psi, obj.err_psi_prev);
             end
 
+            % Derivative term computation
             obj.Derr_psi = obj.bkwFD(obj.err_psi, obj.err_psi_prev);
             
             % PID controller
-            Y = obj.kP_Y * obj.err_psi + ...
+            Y = obj.kP_Y * obj.err_psi_est + ...
                 obj.kI_Y * obj.Serr_psi + ...
                 obj.kD_Y * obj.Derr_psi;
         end
