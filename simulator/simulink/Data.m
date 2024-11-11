@@ -82,43 +82,13 @@ kD = [10;           % -> kD_T                  10                     10
 gains = gainBuilder(kP, kI, kD);
 
 %% Estimator
-sigma_acc = 2e-3;
-sigma_gyro = 1e-3;
+sigma_gyro = 0.005 * sqrt(1/sampleTime) * pi/180;
+sigma_acc = 400*(1e-6) * sqrt(1/sampleTime) / params.g;
 
-P_est = eye(12);
-Q = eye(12).*1e-0;
+P_est = 0.*eye(12);
+Q = 0.*eye(12).*1e-0;
 R = diag([(sigma_acc^2).*ones(3,1); ...
-            (sigma_gyro^2).*ones(3,1)]);
-
-% % Measurements function model
-% 
-% f = @(x, u) [x(4:6);
-%     (1/params.m).*rotMat(x)*[0; 0; u(1)] + [0; 0; -params.g];
-%     x(10:12);
-%     params.I \ ([u(2); u(3); u(4)] - cross(x(10:12), params.I*x(10:12)))
-%     ];
-% 
-% acc = @(x, u) (1/params.m).*rotMat(x)*[0; 0; u(1)] + [0; 0; -params.g];
-% 
-% R_psi = @(x) [cos(x(9)),    -sin(x(9)),     0;
-%     sin(x(9)),     cos(x(9)),     0;
-%     0,             0,     1];
-% 
-% R_theta = @(x) [cos(x(8)),      0,      sin(x(8));
-%     0,      1,              0;
-%     -sin(x(8)),     0,       cos(x(8))];
-% 
-% R_phi = @(x) [1,        0,              0;
-%     0,        cos(x(7)),      -sin(x(7));
-%     0,        sin(x(7)),      cos(x(7))];
-% 
-% rotMat = @(x) R_psi(x) * R_theta(x) * R_phi(x);
-% 
-% h = @(x) [rotMat(x)' * (acc(x, u) + [0;0;-params.g]);
-%     x(10);
-%     x(11);
-%     x(12)
-%     ];
+    (sigma_gyro^2).*ones(3,1)]);
 
 
 %% BUS Creator
