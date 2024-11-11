@@ -1,4 +1,7 @@
 %% DATA
+clear
+clc
+close all
 
 %% Problem initialization
 params = struct();
@@ -77,3 +80,84 @@ kD = [10;           % -> kD_T                  10                     10
     0.9];           % -> kD_Y                  0.066                x 0.01
 
 gains = gainBuilder(kP, kI, kD);
+
+%% Estimator
+sigma_acc = 2e-3;
+sigma_gyro = 1e-3;
+
+P_est = eye(12);
+Q = eye(12).*1e-0;
+R = diag([(sigma_acc^2).*ones(3,1); ...
+            (sigma_gyro^2).*ones(3,1)]);
+
+% % Measurements function model
+% 
+% f = @(x, u) [x(4:6);
+%     (1/params.m).*rotMat(x)*[0; 0; u(1)] + [0; 0; -params.g];
+%     x(10:12);
+%     params.I \ ([u(2); u(3); u(4)] - cross(x(10:12), params.I*x(10:12)))
+%     ];
+% 
+% acc = @(x, u) (1/params.m).*rotMat(x)*[0; 0; u(1)] + [0; 0; -params.g];
+% 
+% R_psi = @(x) [cos(x(9)),    -sin(x(9)),     0;
+%     sin(x(9)),     cos(x(9)),     0;
+%     0,             0,     1];
+% 
+% R_theta = @(x) [cos(x(8)),      0,      sin(x(8));
+%     0,      1,              0;
+%     -sin(x(8)),     0,       cos(x(8))];
+% 
+% R_phi = @(x) [1,        0,              0;
+%     0,        cos(x(7)),      -sin(x(7));
+%     0,        sin(x(7)),      cos(x(7))];
+% 
+% rotMat = @(x) R_psi(x) * R_theta(x) * R_phi(x);
+% 
+% h = @(x) [rotMat(x)' * (acc(x, u) + [0;0;-params.g]);
+%     x(10);
+%     x(11);
+%     x(12)
+%     ];
+
+
+%% BUS Creator
+clear elems;
+
+% Dynamics BUS
+elems(1) = Simulink.BusElement;
+elems(1).Name = 'state_true';
+elems(1).DataType = 'double';
+elems(1).Dimensions = [12, 1];
+
+elems(2) = Simulink.BusElement;
+elems(2).Name = "acc_true";
+elems(2).DataType = "double";
+elems(2).Dimensions = [3, 1];
+
+elems(3) = Simulink.BusElement;
+elems(3).Name = "w_true";
+elems(3).DataType = "double";
+elems(3).Dimensions = [3, 1];
+
+bus_dynamics = Simulink.Bus;
+bus_dynamics.Elements = elems;
+
+% OBC BUS
+clear elems;
+elems(1) = Simulink.BusElement;
+elems(1).Name = 'state_est';
+elems(1).DataType = 'double';
+elems(1).Dimensions = [12, 1];
+
+elems(2) = Simulink.BusElement;
+elems(2).Name = 'motor_cmd';
+elems(2).DataType = 'double';
+elems(2).Dimensions = [4, 1];
+
+bus_OBC = Simulink.Bus;
+bus_OBC.Elements = elems;
+
+% Sensors BUS
+clear elems;
+

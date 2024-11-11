@@ -257,7 +257,7 @@ if (plot_flag)
     plot(tvec, desideredState.rDes.*ones(size(tvec)), 'k--');
     xlabel('Time [s]');
     ylabel('Trajectory [m]');
-    legend('x_est', 'y_est', 'z_est');
+    legend('x est', 'y est', 'z est');
     title('Trajectory Estimation');
 
     % % Lyapunov Function

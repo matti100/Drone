@@ -323,7 +323,13 @@ classdef Drone < handle
 
             obj.P_est = eye(12);
 
-            obj.h = @(x) [obj.rotMat(x)' * (obj.dx(4:6) + [0;0;-obj.g]);
+            % obj.h = @(x) [obj.rotMat(x)' * (obj.dx(4:6) + [0;0;-obj.g]);
+            %     x(10);
+            %     x(11);
+            %     x(12)
+            %     ];
+
+            obj.h = @(x, u) [obj.rotMat(x)' * ((1/obj.m).*obj.rotMat(x)*[0; 0; u(1)] + [0;0;-obj.g]);
                 x(10);
                 x(11);
                 x(12)
@@ -431,8 +437,9 @@ classdef Drone < handle
         function obj = integrateSystem(obj, state, cmd)
 
             % Integrate system of odes
-            % Explicit Euler integration method
             obj.dx = obj.func(state, cmd);
+
+            % Explicit Euler integration method
             obj.x = state + ( obj.dx .* obj.dt );
 
             % % Runge-Kutta 4
@@ -463,14 +470,26 @@ classdef Drone < handle
             % SampleTime counter
             obj.counter = obj.counter + 1;
 
-            % Motor commands
+
             if obj.counter >= 1/(obj.dt/obj.sampleTime)
+
+                % State Estimation
+                if (obj.estimation)
+                    obj.Estimator();
+                    obj.x_old = obj.x;
+                    obj.x = obj.x_est;
+                end
+
+                % Motor Commands
                 obj.u_old = obj.u;
                 obj.motorCMD();
-            end
 
+                obj.counter = 0;
+            end
+            obj.traj_est = [obj.traj_est; obj.x_est'];
             obj.U = [obj.U; obj.u'];
             
+
             % Integrate system of odes.
             obj.integrateSystem(obj.x_old, obj.u);
 
@@ -483,15 +502,15 @@ classdef Drone < handle
             % Update trajectory
             obj.traj = [obj.traj; obj.x'];
             
-            % State estimation
-            if(obj.estimation)
-                if obj.counter >= 1/(obj.dt/obj.sampleTime)
-                    obj.Estimator();
-                end
-                obj.x_old = obj.x;
-                obj.x = obj.x_est;
-            end
-            obj.traj_est = [obj.traj_est; obj.x_est'];
+            % % State estimation
+            % if(obj.estimation)
+            %     if obj.counter >= 1/(obj.dt/obj.sampleTime)
+            %         obj.Estimator();
+            %     end
+            %     obj.x_old = obj.x;
+            %     obj.x = obj.x_est;
+            % end
+            % obj.traj_est = [obj.traj_est; obj.x_est'];
 
             % Update Lyapunov function
             [V, dV] = lyapunov(obj, obj.V(end));
@@ -517,10 +536,10 @@ classdef Drone < handle
             obj.Err_theta = [obj.Err_theta, obj.err_theta];
             obj.Err_psi = [obj.Err_psi, obj.err_psi];
 
-            % Reset sampleTime counter
-            if obj.counter >= 1/(obj.dt/obj.sampleTime)
-                obj.counter = 0;
-            end
+            % % Reset sampleTime counter
+            % if obj.counter >= 1/(obj.dt/obj.sampleTime)
+            %     obj.counter = 0;
+            % end
 
         end
 
@@ -619,14 +638,17 @@ classdef Drone < handle
         function obj = KalmanFilter(obj) 
 
             % Prediction
-            obj.x_pred = obj.x;
+            % obj.x_pred = obj.x;
+            % obj.x_pred = obj.x_est;
+            obj.x_pred = obj.x_est + obj.func(obj.x_est, obj.u).*obj.sampleTime;
 
-            AJ = obj.JacobianA(obj.func, obj.x_est);
+            % AJ = obj.JacobianA(obj.func, obj.x_est);
+            AJ = obj.JacobianA(obj.func, obj.x_pred);
 
             obj.P_pred = AJ * obj.P_est * AJ' + obj.Q;
 
             % Correction
-            obj.h_x_pred = obj.h(obj.x_pred);
+            obj.h_x_pred = obj.h(obj.x_pred, obj.u);
             HJ = obj.JacobianH(obj.h, obj.x_pred);
 
             % Kalman Gain
@@ -669,8 +691,8 @@ classdef Drone < handle
                     xEst1(k) = x(k) + dX;
                     xEst2(k) = x(k) - dX;
 
-                    j1 = f(xEst1);
-                    j2 = f(xEst2);
+                    j1 = f(xEst1, obj.u);
+                    j2 = f(xEst2, obj.u);
 
                     J(i, k) = (j1(i) - j2(i)) / (2 * dX);
                 end
