@@ -15,5 +15,3 @@ As of May 2024, the project is being carried out by a second-year Aerospace Engi
 
 This approach not only helps me develop a critical mindset toward problem-solving, but also provides a clear and well-structured resource for anyone looking for a simple (yet technically accurate) guide.
 
-
-
