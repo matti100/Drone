@@ -7,11 +7,11 @@ The repository is composed of three different sub-directories:
 - arduino_scripts: contains the main script and functions, other than usefull libraries and modules;
 - matlab_scripts: contains Matlab and Simulink simulation codes.
 ## Aim of the project
-The aim of the project is to apply engineering knowledge acquired in any bachelor degrees to real-life problems, but foremost develop "on-the-field" skills related to electronics, sensor fusion, control-systems and propulsion.
-As of today, May 2024, the project is carried by a second-year Aerospace Engineering student and the documentation
-is meant to be simple and understandable to everyone, even to those who don't have a STEM background, with plenty of
-explanations and insights to the topics. In this way, me personally has the opportunity to develop a critic approach to the problem, other than
-leaving a clear documentation for those who are looking for a well-explained, simple (but not incorrect) "manual".
+The goal of this project is to apply the engineering knowledge acquired during a bachelor’s degree to real-world problems, while also developing practical skills in electronics, sensor fusion, control theory, and flight mechanics.
+
+As of May 2024, the project is being carried out by a second-year Aerospace Engineering student. The documentation is intentionally written to be accessible and easy to understand—even for readers without a STEM background—by including detailed explanations and insights into the various topics.
+
+This approach not only helps me develop a critical mindset toward problem-solving, but also provides a clear and well-structured resource for anyone looking for a simple (yet technically accurate) guide.
 
 
 
