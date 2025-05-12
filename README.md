@@ -7,7 +7,7 @@ The repository is composed of three different sub-directories:
 - arduino_scripts: contains the main script and functions, other than usefull libraries and modules;
 - matlab_scripts: contains Matlab and Simulink simulation scripts.
 - electronics: contains the schematics and PCBs of the piece of hardware used
-- WebApp: (TBD) cotains the codes for a WebApp intended to be used to control the drone using IoT technology
+- WebApp: cotains the codes for a WebApp intended to be used to control the drone using IoT technology
 ## Aim of the project
 The goal of this project is to apply the engineering knowledge acquired during a bachelor’s degree to real-world problems, while also developing practical skills in electronics, sensor fusion, control theory, and flight mechanics.
 
