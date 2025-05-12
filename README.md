@@ -3,9 +3,11 @@ Repository dedicated to the design of a DIY quadcopter, with related technical d
 ## Repository Tree description
 "Drone" is the main folder containing all the documentation and script associated to the project.
 The repository is composed of three different sub-directories:
-- doc: contains the documentation of the project and datasheets of the components;
+- docs: contains the documentation of the project and datasheets of the components;
 - arduino_scripts: contains the main script and functions, other than usefull libraries and modules;
-- matlab_scripts: contains Matlab and Simulink simulation codes.
+- matlab_scripts: contains Matlab and Simulink simulation scripts.
+- electronics: contains the schematics and PCBs of the piece of hardware used
+- WebApp: (TBD) cotains the codes for a WebApp intended to be used to control the drone using IoT technology
 ## Aim of the project
 The goal of this project is to apply the engineering knowledge acquired during a bachelor’s degree to real-world problems, while also developing practical skills in electronics, sensor fusion, control theory, and flight mechanics.
 
