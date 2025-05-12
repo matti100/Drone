@@ -59,7 +59,7 @@ desideredState.attDes = [0, 0, 0]';
 
 % Initialize simulation time
 t0 = 0;                 % [s]
-tmax = 5;              % [s]
+tmax = 10;              % [s]
 tspan = [t0, tmax];
 tvec = t0:params.dt:tmax;
 
@@ -81,7 +81,7 @@ sampleTime = 0.005;      % [s] sample time for the discrete system
 
 % Plot flag
 plot_flag = 1;               % 1 -> plot                0 -> no plot
-anim_flag = 1;               % 1 -> animation           0 -> no animation
+anim_flag = 0;               % 1 -> animation           0 -> no animation
 
 % Tuner flag
 tuner_flag = 0;         % 1 -> Gradient Descent optimization
