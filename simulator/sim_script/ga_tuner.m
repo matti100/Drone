@@ -11,6 +11,7 @@ err = tol +1;
 while (gen <= maxGen && err >= tol)
 
     gen = gen +1;
+
     % Fitness function computation
     fitness = zeros(pop_size, 1);
     parfor i = 1:pop_size
@@ -19,7 +20,7 @@ while (gen <= maxGen && err >= tol)
 
     % New popolation
     new_pop = zeros(pop_size, 18);
-    for i = 1:pop_size
+    parfor i = 1:pop_size
         % Selection
         parent1 = roulette_selection(pop, fitness);
         parent2 = roulette_selection(pop, fitness);
@@ -69,40 +70,50 @@ parfor j = 1:length(Drone.tvec)-1
     Drone.updateState();
 end
 
-% Mean Square Error computation (MSE)
-% err_x = Drone.err_x(~isnan(Drone.err_x) & ~isinf(Drone.err_x));
-% err_y = Drone.err_y(~isnan(Drone.err_y) & ~isinf(Drone.err_y));
-% err_z = Drone.err_z(~isnan(Drone.err_z) & ~isinf(Drone.err_z));
-% err_phi = Drone.err_phi(~isnan(Drone.err_phi) & ~isinf(Drone.err_phi));
-% err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
-% err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
+% Integral of Square Error (ISE)
 
-% error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
-% error = [err_x; err_y; err_z];
-error = (Drone.Err_x).^2 + (Drone.Err_y).^2 + (Drone.Err_z).^2;
-error(isinf(error)) = 1e10; % Sostituisce inf con 1000
-error(isnan(error)) = eps * 1e2;    % Sostituisce NaN con 0
-% error = error.*Drone.t(1:1/Drone.sampleTime:end-1);
-% MSE = mean(error);
-ISE = trapz(error);
-% ITSE = trapz(error.*Drone.t);
+err_x = Drone.Err_x;
+err_y = Drone.Err_y;
+err_z = Drone.Err_z;
+err_phi = Drone.Err_phi;
+err_theta = Drone.Err_theta;
+err_psi = Drone.Err_psi;
+
+err_x(isnan(err_x)) = eps(0);
+err_y(isnan(err_y)) = eps(0);
+err_z(isnan(err_z)) = eps(0);
+err_phi(isnan(err_phi)) = eps(0);
+err_theta(isnan(err_theta)) = eps(0);
+err_psi(isnan(err_psi)) = eps(0);
+
+err_x(isinf(err_x)) = realmax;
+err_y(isinf(err_y)) = realmax;
+err_z(isinf(err_z)) = realmax;
+err_phi(isinf(err_phi)) = realmax;
+err_theta(isinf(err_theta)) = realmax;
+err_psi(isinf(err_psi)) = realmax;
+
+error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
+error = error.^2;
+
+ISE = norm(trapz(error));
 
 % % Lyapunov Function derivative
-% dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
-% 
+% dV = Drone.dV;
+% dV(isnan(dV)) = eps(0);
+% dV(isinf(dV)) = realmax;
+%
 % V_dot = max(dV, zeros(size(dV)));
-% V_dot = sum(V_dot);
+% V_dot = trapz(V_dot);
 
 % Fitness function computation
-% fitness = MSE + V_dot;
-% fitness = MSE;
 fitness = ISE;
-% fitness = ITSE;
+
 end
 
 % Select random parent from population
 function selected = roulette_selection(pop, fitness)
-fitness(fitness == 0) = 1e-6;  % Avoid division by zero
+fitness(fitness == 0) = eps(0);  % Avoid division by zero
 prob = (1./fitness) ./ (sum(1./fitness));     % Calcola la probabilità di ogni individuo
 cumprob = cumsum(prob);              % Distribuzione cumulativa
 r = rand();                          % Numero casuale tra 0 e 1

@@ -435,7 +435,7 @@ classdef Drone < handle
             else
                 if (obj.control > 0)
                     % LQR
-                    obj.u_lin = obj.K * (obj.xDes - obj.x);
+                    obj.u_lin = obj.K * (obj.xDes - obj.x_est);
                     obj.u1 = obj.u_lin(1);
                     obj.u2 = obj.u_lin(2);
                     obj.u3 = obj.u_lin(3);
@@ -620,19 +620,21 @@ classdef Drone < handle
                 % LQR control design
                 % State variables weigths;
                 d = zeros(12, 1);
-                d(1:3) = 10;        % x, y, z
+                d(1:3) = 1e3;        % x, y, z
                 d(3) = 1e3;
-                d(4:6) = 1;        % x_dot, y_dot, z_dot
+                d(4:6) = 1e3;        % x_dot, y_dot, z_dot
                 d(7:9) = 10;        % phi, theta, psi
                 d(10:end) = 1;     % phi_dot, theta_dot, psi_dot
                 % Q matrix computation
                 Q_mat = diag(d);
+                % Q_mat = eye(12,12);
 
                 % Input variables weights
-                d = 1.*ones(4,1);
+                d = (1e1).*ones(4,1);
                 d(1) = 0.01;
                 % R matrix computation
                 R_mat = diag(d);
+                % R_mat = eye(4,4);
 
                 % Control matrix computation
                 obj.K = lqr(obj.A, obj.B, Q_mat, R_mat);

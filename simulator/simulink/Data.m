@@ -43,17 +43,14 @@ params.g = 9.81;        % [m/s^2]            % Gravity acceleration
 sampleTime = 0.01;       % [s]                % Time interval
 
 % Initial Condition
-x0 = zeros(12,1);
-x0(1) = 0;
-x0(2) = 0;
-x0(3) = 1;
-x0(7) = 0;
-x0(8) = 0;
-x0(9) = 0;
+r0 = [0; 0; 1];
+v0 = [0; 0; 0];
+att0 = [0; 0; 0];
+w0 = [0; 0; 0];
 
 % Desidered Position
 desiredState = struct();
-desiredState.rDes = [1, -1, 2]';      % [m]
+desiredState.rDes = [-1, 1, 2]';      % [m]
 desiredState.attDes = [0, 0, 0]';
 
 % PID gains
@@ -90,6 +87,39 @@ Q = 0.*eye(12).*1e-0;
 R = diag([(sigma_acc^2).*ones(3,1); ...
     (sigma_gyro^2).*ones(3,1)]);
 
+% Linear system A matrix
+A = zeros(12,12);
+A(1, 4) = 1;
+A(2, 5) = 1;
+A(3, 6) = 1;
+A(4, 7) = params.g*sin(desiredState.attDes(3));
+A(4, 8) = params.g*cos(desiredState.attDes(3));
+A(5, 7) = -params.g*cos(desiredState.attDes(3));
+A(5, 8) = params.g*sin(desiredState.attDes(3));
+A(7, 10) = 1;
+A(8, 11) = 1;
+A(9, 12) = 1;
+
+% Linear system B matrix
+B = zeros(12, 4);
+B(6, 1) = 1/params.m;
+B(10, 2) = 1/params.Ix;
+B(11, 3) = 1/params.Iy;
+B(12, 4) = 1/params.Iz;
+
+% Linear system C matrix
+C = zeros(6, 12);
+C(1, 4) = 1/sampleTime;
+C(2, 5) = 1/sampleTime;
+C(3, 6) = 1/sampleTime;
+C(4, 10) = 1;
+C(5, 11) = 1;
+C(6, 12) = 1;
+
+% Linear system D matrix
+D = zeros(6,4);
+
+alpha = 0.98;
 
 %% BUS Creator
 clear elems;
@@ -101,7 +131,7 @@ elems(1).DataType = 'double';
 elems(1).Dimensions = [12, 1];
 
 elems(2) = Simulink.BusElement;
-elems(2).Name = "acc_true";
+elems(2).Name = "acc_body";
 elems(2).DataType = "double";
 elems(2).Dimensions = [3, 1];
 
@@ -109,6 +139,11 @@ elems(3) = Simulink.BusElement;
 elems(3).Name = "w_true";
 elems(3).DataType = "double";
 elems(3).Dimensions = [3, 1];
+
+elems(4) = Simulink.BusElement;
+elems(4).Name = "acc_true";
+elems(4).DataType = "double";
+elems(4).Dimensions = [3, 1];
 
 bus_dynamics = Simulink.Bus;
 bus_dynamics.Elements = elems;
@@ -118,7 +153,7 @@ clear elems;
 elems(1) = Simulink.BusElement;
 elems(1).Name = 'state_est';
 elems(1).DataType = 'double';
-elems(1).Dimensions = [12, 1];
+elems(1).Dimensions = [6, 1];
 
 elems(2) = Simulink.BusElement;
 elems(2).Name = 'motor_cmd';

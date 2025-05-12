@@ -1,7 +1,7 @@
 function tunedGains = PID_tuner(Drone, k0, maxIter, tol, alpha)
 
 % Start Parallel Computing
-parpool("Processes", 8);
+% parpool("Processes", 8);
 
 % Initial k values
 kP = k0(:, 1);
@@ -15,7 +15,7 @@ dJ_dk = zeros(18,1);
 % Gradient optimization method
 iter = 0;
 err_grad = tol + 1;
-dk = 0.0001;
+dk = 0.01;
 while iter < maxIter && err_grad > tol
     iter = iter +1;
 
@@ -45,7 +45,7 @@ while iter < maxIter && err_grad > tol
 
     % Error gradient method
     % err_grad = max(abs(k - k_prev));
-    err_grad = J;
+    err_grad = norm(dJ_dk);
 
     logger(iter, k, err_grad);
 
@@ -66,33 +66,41 @@ g = gainBuilder(kP, kI, kD);
 Drone.updateGains(g);
 
 % Simulation
-for i = 1:length(Drone.tvec)-1
+parfor i = 1:length(Drone.tvec)-1
     Drone.updateState();
 end
 
-% Mean Square Error (MSE)
-err_x = Drone.err_x(~isnan(Drone.err_x) & ~isinf(Drone.err_x));
-err_y = Drone.err_y(~isnan(Drone.err_y) & ~isinf(Drone.err_y));
-err_z = Drone.err_z(~isnan(Drone.err_z) & ~isinf(Drone.err_z));
-err_phi = Drone.err_phi(~isnan(Drone.err_phi) & ~isinf(Drone.err_phi));
-err_theta = Drone.err_theta(~isnan(Drone.err_theta) & ~isinf(Drone.err_theta));
-err_psi = Drone.err_psi(~isnan(Drone.err_psi) & ~isinf(Drone.err_psi));
+% Integral of Square Error (ISE)
 
-% error = [Drone.err_x; Drone.err_y; Drone.err_z; Drone.err_phi; Drone.err_theta; Drone.err_psi];
+err_x = Drone.Err_x;
+err_y = Drone.Err_y;
+err_z = Drone.Err_z;
+err_phi = Drone.Err_phi;
+err_theta = Drone.Err_theta;
+err_psi = Drone.Err_psi;
+
+err_x(isnan(err_x)) = eps(0);
+err_y(isnan(err_y)) = eps(0);
+err_z(isnan(err_z)) = eps(0);
+err_phi(isnan(err_phi)) = eps(0);
+err_theta(isnan(err_theta)) = eps(0);
+err_psi(isnan(err_psi)) = eps(0);
+
+err_x(isinf(err_x)) = realmax;
+err_y(isinf(err_y)) = realmax;
+err_z(isinf(err_z)) = realmax;
+err_phi(isinf(err_phi)) = realmax;
+err_theta(isinf(err_theta)) = realmax;
+err_psi(isinf(err_psi)) = realmax;
+
 error = [err_x; err_y; err_z; err_phi; err_theta; err_psi];
 error = error.^2;
-MSE = mean(error);
 
-% Lyapunov Function derivative
-dV = Drone.dV(~isnan(Drone.dV) & ~isinf(Drone.dV));
-% dV = Drone.dV
-
-V_dot = max(dV, zeros(size(dV)));
-V_dot = sum(V_dot);
-V_dot = 0;
+ISE = norm(trapz(error));
 
 % Cost function
-J = MSE + V_dot;
+J = ISE;
+
 end
 
 function logger(iter, k, err_grad)

@@ -1,4 +1,4 @@
-function y = stateFunction(x,inputs)
+function y = stateFunction(x, inputs, inputs2)
 
 u = inputs(1:4, 1);
 mass = inputs(5,1);
@@ -23,6 +23,6 @@ y = x + [x(4:6);
         (1/mass).*rotMat(x)*[0; 0; u(1)] + [0; 0; -g];
         x(10:12);
         I \ ([u(2); u(3); u(4)] - cross(x(10:12), I*x(10:12)))
-        ];
+        ] .* dt;
 end
 
