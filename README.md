@@ -5,7 +5,7 @@ Repository dedicated to the design of a DIY quadcopter, with related technical d
 The repository is composed of three different sub-directories:
 - docs: contains the documentation of the project and datasheets of the components;
 - arduino_scripts: contains the main script and functions, other than usefull libraries and modules;
-- matlab_scripts: contains Matlab and Simulink simulation scripts.
+- simulator: contains Matlab and Simulink simulation scripts.
 - electronics: contains the schematics and PCBs of the piece of hardware used
 - WebApp: cotains the codes for a WebApp intended to be used to control the drone using IoT technology
 ## Aim of the project
